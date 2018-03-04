@@ -14,7 +14,7 @@ use std::ffi::CStr;
 use std::ops::Deref;
 
 
-/// A job identifier number; this will always be u32.
+/// A job identifier number; this will always be `u32`.
 pub type JobId = u32;
 
 
@@ -63,8 +63,12 @@ impl JobInfo {
 
 /// Get information about a single job.
 ///
-/// Due to how the SLURM library's memory management works, the return
-/// value of this API call can't be a JobInfo struct, annoyingly.
+/// The job must still be running. If it existed but is no longer running,
+/// the result is an error (errno 2017, "invalid job id").
+///
+/// While the (successful) return value of this function is not a `JobInfo`
+/// struct, it is a type that derefs to `JobInfo`, and so can be used like
+/// one.
 pub fn get_job_info(jid: JobId) -> Result<SingleJobInfoResponse, Error> {
     let mut resp: *mut slurm_sys::job_info_msg_t = 0 as _;
 
@@ -82,6 +86,11 @@ pub fn get_job_info(jid: JobId) -> Result<SingleJobInfoResponse, Error> {
 }
 
 
+/// Information about a single job.
+///
+/// This type implements `Deref` to `JobInfo` and so can be essentially be
+/// treated as a `JobInfo`. Due to how the SLURM library manages memory, this
+/// separate type is necessary in some cases.
 #[derive(Debug)]
 pub struct SingleJobInfoResponse {
     message: *mut slurm_sys::job_info_msg_t,
