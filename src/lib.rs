@@ -144,21 +144,23 @@ fn slurm_free<T>(thing: &mut *mut T) {
 /// have to do. All of these types are "borrowed" items; they should not
 /// implement Drop methods.
 macro_rules! make_slurm_wrap_struct {
-    ($rust_name:ident, $slurm_name:ident, $doc:expr) => {
+    ($rust_name:ident, $slurm_name:path, $doc:expr) => {
         #[doc = $doc]
         #[derive(Debug)]
-        pub struct $rust_name(*mut slurm_sys::$slurm_name);
+        pub struct $rust_name(*mut $slurm_name);
 
         impl $rust_name {
             /// Access the underlying slurm_sys struct immutably.
             #[allow(unused)]
-            fn sys_data(&self) -> &slurm_sys::$slurm_name {
+            #[inline(always)]
+            fn sys_data(&self) -> &$slurm_name {
                 unsafe { &(*self.0) }
             }
 
             /// Access the underlying slurm_sys struct mutably.
             #[allow(unused)]
-            fn sys_data_mut(&mut self) -> &mut slurm_sys::$slurm_name {
+            #[inline(always)]
+            fn sys_data_mut(&mut self) -> &mut $slurm_name {
                 unsafe { &mut (*self.0) }
             }
 
@@ -169,13 +171,15 @@ macro_rules! make_slurm_wrap_struct {
             /// references to fields of various `slurm_sys` structs as if
             /// they were our Rust wrapper types.
             #[allow(unused)]
-            unsafe fn transmute_ptr<'a>(ptr: &'a *mut slurm_sys::$slurm_name) -> &'a Self {
+            #[inline(always)]
+            unsafe fn transmute_ptr<'a>(ptr: &'a *mut $slurm_name) -> &'a Self {
                 std::mem::transmute(ptr)
             }
 
             /// Like `transmute_ptr`, but mutable.
             #[allow(unused)]
-            unsafe fn transmute_ptr_mut<'a>(ptr: &'a mut *mut slurm_sys::$slurm_name) -> &'a mut Self {
+            #[inline(always)]
+            unsafe fn transmute_ptr_mut<'a>(ptr: &'a mut *mut $slurm_name) -> &'a mut Self {
                 std::mem::transmute(ptr)
             }
         }
@@ -253,10 +257,19 @@ macro_rules! make_owned_version {
 #[derive(Debug)]
 pub struct SlurmList<T>(*mut slurm_sys::xlist, PhantomData<T>);
 
+impl<T> SlurmList<T> {
+    unsafe fn transmute_ptr<'a>(ptr: &'a *mut slurm_sys::xlist) -> &'a Self {
+        std::mem::transmute(ptr)
+    }
+
+    unsafe fn transmute_ptr_mut<'a>(ptr: &'a mut *mut slurm_sys::xlist) -> &'a mut Self {
+        std::mem::transmute(ptr)
+    }
+}
 
 // Now we can finally start wrapping types that we care about.
 
-make_slurm_wrap_struct!(JobInfo, job_info, "Information about a running job.");
+make_slurm_wrap_struct!(JobInfo, slurm_sys::job_info, "Information about a running job.");
 
 impl JobInfo {
      /// Get this job's ID.
@@ -293,7 +306,7 @@ pub fn get_job_info(jid: JobId) -> Result<SingleJobInfoMessageOwned, Error> {
 }
 
 
-make_slurm_wrap_struct!(SingleJobInfoMessage, job_info_msg_t, "Information about a single job.
+make_slurm_wrap_struct!(SingleJobInfoMessage, slurm_sys::job_info_msg_t, "Information about a single job.
 
 This type implements `Deref` to `JobInfo` and so can be essentially be
 treated as a `JobInfo`. Due to how the Slurm library manages memory, this
@@ -323,11 +336,12 @@ impl Drop for SingleJobInfoMessageOwned {
 }
 
 
-/// A connection to the Slurm accounting database.
-#[derive(Debug)]
-pub struct DatabaseConnection(*mut c_void);
+make_slurm_wrap_struct!(DatabaseConnection, c_void, "A connection to the Slurm accounting database.");
 
-impl DatabaseConnection {
+make_owned_version!(@customdrop DatabaseConnection, DatabaseConnectionOwned,
+                    "An owned version of `DatabaseConnection`.");
+
+impl DatabaseConnectionOwned {
     /// Connect to the Slurm database.
     pub fn new() -> Result<Self, SlurmError> {
         let ptr = unsafe { slurm_sys::slurmdb_connection_get() };
@@ -336,40 +350,32 @@ impl DatabaseConnection {
             let e = unsafe { slurm_sys::slurm_get_errno() };
             Err(SlurmError::from_slurm(e))
         } else {
-            Ok(DatabaseConnection(ptr))
+            Ok(unsafe { DatabaseConnectionOwned::assume_ownership(ptr) })
         }
     }
 }
 
-
-impl Drop for DatabaseConnection {
+impl Drop for DatabaseConnectionOwned {
     fn drop(&mut self) {
-        let _ignored = unsafe { slurm_sys::slurmdb_connection_close(&mut self.0) };
+        // This function can return error codes, but we're not in a position
+        // to do anything about it in the Drop call.
+        let _ignored = unsafe { slurm_sys::slurmdb_connection_close(&mut (self.0).0) };
     }
 }
 
 
-/// A set of filters for identifying jobs of interest when querying the Slurm
-/// accounting database.
-#[derive(Debug)]
-pub struct JobFilters(*mut slurm_sys::slurmdb_job_cond_t);
+make_slurm_wrap_struct!(JobFilters, slurm_sys::slurmdb_job_cond_t, "A set of
+                        filters for identifying jobs of interest when querying
+                        the Slurm accounting database.");
 
 impl JobFilters {
-    fn sys_data(&self) -> &slurm_sys::slurmdb_job_cond_t {
-        unsafe { &(*self.0) }
+    pub fn step_list(&self) -> &SlurmList<JobStepFilter> {
+        unsafe { SlurmList::transmute_ptr(&self.sys_data().step_list) }
     }
 
-    fn sys_data_mut(&mut self) -> &mut slurm_sys::slurmdb_job_cond_t {
-        unsafe { &mut (*self.0) }
+    pub fn step_list_mut(&mut self) -> &mut SlurmList<JobStepFilter> {
+        unsafe { SlurmList::transmute_ptr_mut(&mut self.sys_data_mut().step_list) }
     }
-
-    //pub fn step_list(&self) -> &SlurmList<JobStepFilter> {
-    //    unsafe { SlurmList::transmute(&(*self.0).step_list) }
-    //}
-    //
-    //pub fn step_list_mut(&mut self) -> &mut SlurmList<JobStepFilter> {
-    //    unsafe { SlurmList::transmute_mut(&mut (*self.0).step_list) }
-    //}
 }
 
 make_owned_version!(JobFilters, JobFiltersOwned, "An owned version of `JobFilters`");
@@ -386,18 +392,41 @@ impl Default for JobFiltersOwned {
 }
 
 
-/// A filter for selecting jobs and job steps.
-#[derive(Copy, Clone, Debug)]
-pub struct JobStepFilter(*mut slurm_sys::slurmdb_selected_step_t);
+make_slurm_wrap_struct!(JobStepFilter, slurm_sys::slurmdb_selected_step_t,
+                        "A filter for selecting jobs and job steps.");
 
-//impl JobStepFilter {
-//    /// Create a new job step filter
-//    pub fn new(jid: JobId) -> Self {
-//        JobStepFilter(slurm_sys::slurmdb_selected_step_t {
-//            array_task_id: slurm_sys::SLURMRS_NO_VAL,
-//            jobid: jid,
-//            pack_job_offset: slurm_sys::SLURMRS_NO_VAL,
-//            stepid: slurm_sys::SLURMRS_NO_VAL,
-//        })
-//    }
-//}
+make_owned_version!(@customdrop JobStepFilter, JobStepFilterOwned, "An owned version of `JobStepFilter`.");
+
+impl Drop for JobStepFilterOwned {
+    fn drop(&mut self) {
+        unsafe { slurm_sys::slurmdb_destroy_selected_step((self.0).0 as _) };
+    }
+}
+
+impl JobStepFilterOwned {
+    /// Create a new job step filter.
+    pub fn new(jid: JobId) -> Self {
+        let mut inst = unsafe { Self::alloc_zeroed() };
+        {
+            let sdm = inst.sys_data_mut();
+            sdm.array_task_id = slurm_sys::SLURMRS_NO_VAL;
+            sdm.jobid = jid;
+            sdm.pack_job_offset = slurm_sys::SLURMRS_NO_VAL;
+            sdm.stepid = slurm_sys::SLURMRS_NO_VAL;
+        }
+        inst
+    }
+}
+
+impl SlurmList<JobStepFilter> {
+    pub fn append(&mut self, item: JobStepFilterOwned) {
+        let item = unsafe { item.give_up_ownership() };
+
+        if self.0 == 0 as _ {
+            // XXX if malloc fails, I think this function will abort under us.
+            self.0 = unsafe { slurm_sys::slurm_list_create(Some(slurm_sys::slurmdb_destroy_selected_step)) };
+        }
+
+        unsafe { slurm_sys::slurm_list_append(self.0, item.0 as _); }
+    }
+}
