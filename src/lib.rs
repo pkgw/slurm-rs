@@ -6,16 +6,81 @@
 */
 
 #[macro_use] extern crate failure;
+#[macro_use] extern crate failure_derive;
 extern crate slurm_sys;
 
 use failure::Error;
 use std::borrow::Cow;
 use std::ffi::CStr;
+use std::fmt::{Display, Error as FmtError, Formatter};
 use std::ops::Deref;
+use std::os::raw::c_int;
 
 
 /// A job identifier number; this will always be `u32`.
 pub type JobId = u32;
+
+
+// (Ab)use macros a bit to map low-level slurm API errors to a Rust interface.
+
+macro_rules! each_mapped_slurm_error {
+    ($mac:ident) => {
+        $mac!(
+            <InvalidJobId, slurm_sys::ESLURM_INVALID_JOB_ID,
+             "The job ID did not correspond to a valid job.";>,
+            <InvalidPartitionName, slurm_sys::ESLURM_INVALID_PARTITION_NAME,
+             "The specified partition name was not recognized.";>
+        );
+    }
+}
+
+macro_rules! declare_slurm_error {
+    ($(<$rustname:ident, $sysname:path, $doc:expr;>),*) => {
+        /// Specifically-enumerated errors that we can get from the SLURM API.
+        ///
+        /// This is not exhaustive; the only specifically implemented options are ones
+        /// that are expected to be of interest to general developers.
+        #[derive(Copy, Clone, Debug, Eq, Fail, Hash, PartialEq)]
+        pub enum SlurmError {
+            $(
+                #[doc=$doc] $rustname,
+            )*
+
+            /// Some other SLURM error.
+            Other(c_int),
+        }
+
+        impl SlurmError {
+            fn from_slurm(errno: c_int) -> SlurmError {
+                match errno as u32 {
+                    $(
+                        $sysname => SlurmError::$rustname,
+                    )*
+                    _ => SlurmError::Other(errno),
+                }
+            }
+
+            fn to_slurm(&self) -> c_int {
+                match self {
+                    $(
+                        &SlurmError::$rustname => $sysname as c_int,
+                    )*
+                    &SlurmError::Other(errno) => errno,
+                }
+            }
+        }
+    }
+}
+
+each_mapped_slurm_error!(declare_slurm_error);
+
+impl Display for SlurmError {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), FmtError> {
+        let e = self.to_slurm();
+        let m = unsafe { CStr::from_ptr(slurm_sys::slurm_strerror(e)) };
+        write!(f, "{} (SLURM errno {})", m.to_string_lossy(), e)
+    }
+}
 
 
 /// Most SLURM API calls return an zero on success. The library API docs state
@@ -27,8 +92,7 @@ macro_rules! stry {
     ($op:expr) => {{
         if $op != 0 {
             let e = unsafe { slurm_sys::slurm_get_errno() };
-            let m = unsafe { CStr::from_ptr(slurm_sys::slurm_strerror(e)) };
-            Err(format_err!("SLURM error {}: {}", e, m.to_string_lossy()))
+            Err(SlurmError::from_slurm(e))
         } else {
             Ok(())
         }?
