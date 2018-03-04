@@ -22,6 +22,9 @@ fn main() {
     let bindings = builder
         .whitelist_type("slurm_.*")
         .whitelist_function("slurm_.*")
+        .whitelist_var("SLURM.*")
+        .whitelist_var("ESCRIPT.*")
+        .whitelist_var("ESLURM.*")
         .generate()
         .expect("Unable to generate bindings");
 
