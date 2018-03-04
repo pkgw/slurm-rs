@@ -1,7 +1,7 @@
 // Copyright 2017-2018 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT License
 
-/*! Interface to the SLURM cluster job manager.
+/*! Interface to the Slurm workload manager.
 
 */
 
@@ -36,7 +36,7 @@ macro_rules! each_mapped_slurm_error {
 
 macro_rules! declare_slurm_error {
     ($(<$rustname:ident, $sysname:path, $doc:expr;>),*) => {
-        /// Specifically-enumerated errors that we can get from the SLURM API.
+        /// Specifically-enumerated errors that we can get from the Slurm API.
         ///
         /// This is not exhaustive; the only specifically implemented options are ones
         /// that are expected to be of interest to general developers.
@@ -46,7 +46,7 @@ macro_rules! declare_slurm_error {
                 #[doc=$doc] $rustname,
             )*
 
-            /// Some other SLURM error.
+            /// Some other Slurm error.
             Other(c_int),
         }
 
@@ -78,12 +78,12 @@ impl Display for SlurmError {
     fn fmt(&self, f: &mut Formatter) -> Result<(), FmtError> {
         let e = self.to_slurm();
         let m = unsafe { CStr::from_ptr(slurm_sys::slurm_strerror(e)) };
-        write!(f, "{} (SLURM errno {})", m.to_string_lossy(), e)
+        write!(f, "{} (Slurm errno {})", m.to_string_lossy(), e)
     }
 }
 
 
-/// Most SLURM API calls return an zero on success. The library API docs state
+/// Most Slurm API calls return an zero on success. The library API docs state
 /// that the return code on error is -1, and this macro encapsulates the task
 /// of obtaining an errno and converting it to a result. However, in at least
 /// one case the return code is an errno, which would be a nicer pattern from
@@ -99,7 +99,7 @@ macro_rules! stry {
     }}
 }
 
-/// This is like `stry!` but also wraps the SLURM call in an `unsafe{}` block,
+/// This is like `stry!` but also wraps the Slurm call in an `unsafe{}` block,
 /// since most (all?) of the times we're doing this, we're using the C API.
 macro_rules! ustry {
     ($op:expr) => {
@@ -153,7 +153,7 @@ pub fn get_job_info(jid: JobId) -> Result<SingleJobInfoMessage, Error> {
 /// Information about a single job.
 ///
 /// This type implements `Deref` to `JobInfo` and so can be essentially be
-/// treated as a `JobInfo`. Due to how the SLURM library manages memory, this
+/// treated as a `JobInfo`. Due to how the Slurm library manages memory, this
 /// separate type is necessary in some cases.
 #[derive(Debug)]
 pub struct SingleJobInfoMessage {
