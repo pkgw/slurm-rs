@@ -3,6 +3,10 @@
 
 /*! Interface to the Slurm workload manager.
 
+The Slurm C library uses a (primitive) custom memory allocator for its data
+structures. Because we must maintain compatibility with this allocator, it is
+not helpful to stack-allocate the various Slurm data structures.
+
 */
 
 #[macro_use] extern crate failure;
@@ -11,14 +15,19 @@ extern crate slurm_sys;
 
 use failure::Error;
 use std::borrow::Cow;
+use std::default::Default;
 use std::ffi::CStr;
 use std::fmt::{Display, Error as FmtError, Formatter};
-use std::ops::Deref;
-use std::os::raw::c_int;
+use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
+use std::os::raw::{c_int, c_void};
 
 
 /// A job identifier number; this will always be `u32`.
 pub type JobId = u32;
+
+/// A job-step identifier number; this will always be `u32`.
+pub type StepId = u32;
 
 
 // (Ab)use macros a bit to map low-level slurm API errors to a Rust interface.
@@ -108,19 +117,128 @@ macro_rules! ustry {
 }
 
 
-/// Information about a running job.
-#[derive(Debug)]
-pub struct JobInfo(*mut slurm_sys::job_info);
+/// Allocate a structure using Slurm's allocator.
+fn slurm_alloc<T>() -> *mut T {
+    const TEXT: &[u8] = b"slurm-rs\0";
+    let ptr = unsafe { slurm_sys::slurm_try_xmalloc(std::mem::size_of::<T>(), TEXT.as_ptr() as _, 1, TEXT.as_ptr() as _) };
+
+    if ptr == 0 as _ {
+        panic!("Slurm memory allocation failed");
+    }
+
+    ptr as _
+}
+
+
+/// Free a structure using Slurm's allocator.
+fn slurm_free<T>(thing: &mut *mut T) {
+    const TEXT: &[u8] = b"slurm-rs\0";
+    let p = &mut (*thing as *mut c_void);
+    unsafe { slurm_sys::slurm_xfree(p, TEXT.as_ptr() as _, 1, TEXT.as_ptr() as _) };
+}
+
+
+/// Helper for creating public structs that directly wrap Slurm API
+/// structures. Because we must use Slurm's internal allocator, these all wrap
+/// native pointers. It's a bit annoying but as far as I can tell it's what we
+/// have to do. All of these types are "borrowed" items; they should not
+/// implement Drop methods.
+macro_rules! make_slurm_wrap_struct {
+    ($rust_name:ident, $slurm_name:ident, $doc:expr) => {
+        #[doc = $doc]
+        #[derive(Debug)]
+        pub struct $rust_name(*mut slurm_sys::$slurm_name);
+
+        impl $rust_name {
+            /// Access the underlying slurm_sys struct immutably.
+            #[allow(unused)]
+            fn sys_data(&self) -> &slurm_sys::$slurm_name {
+                unsafe { &(*self.0) }
+            }
+
+            /// Access the underlying slurm_sys struct mutably.
+            #[allow(unused)]
+            fn sys_data_mut(&mut self) -> &mut slurm_sys::$slurm_name {
+                unsafe { &mut (*self.0) }
+            }
+        }
+    }
+}
+
+/// Helper for creating "owned" versions of unowned structs. This is super
+/// tedious but I think it's what we need to do to correctly interface with
+/// Slurm's allocator.
+macro_rules! make_owned_version {
+    (@customdrop $unowned_type:ident, $owned_name:ident, $doc:expr) => {
+        #[doc=$doc]
+        #[derive(Debug)]
+        pub struct $owned_name($unowned_type);
+
+        impl Deref for $owned_name {
+            type Target = $unowned_type;
+
+            fn deref(&self) -> &$unowned_type {
+                &self.0
+            }
+        }
+
+        impl DerefMut for $owned_name {
+            fn deref_mut(&mut self) -> &mut $unowned_type {
+                &mut self.0
+            }
+        }
+
+        impl $owned_name {
+            /// This function is unsafe because it may not be valid for the
+            /// returned value to be filled with zeros. (Slurm is generally
+            /// pretty good about all-zeros being OK, though.)
+            #[allow(unused)]
+            unsafe fn alloc_zeroed() -> Self {
+                $owned_name($unowned_type(slurm_alloc()))
+            }
+
+            /// This function is unsafe because it can potentially leak memory
+            /// if not used correctly.
+            #[allow(unused)]
+            unsafe fn give_up_ownership(mut self) -> $unowned_type {
+                let ptr = (self.0).0;
+                (self.0).0 = 0 as _; // ensures that slurm_free() doesn't free the memory
+                $unowned_type(ptr)
+            }
+
+            /// This function is unsafe because we commit ourselves to freeing
+            /// the passed-in pointer, which could potentially be bad if we
+            /// don't in fact own it.
+            #[allow(unused)]
+            unsafe fn assume_ownership(ptr: *mut c_void) -> Self {
+                $owned_name($unowned_type(ptr as _))
+            }
+        }
+    };
+
+    ($unowned_type:ident, $owned_name:ident, $doc:expr) => {
+        make_owned_version!(@customdrop $unowned_type, $owned_name, $doc);
+
+        impl Drop for $owned_name {
+            fn drop(&mut self) {
+                slurm_free(&mut (self.0).0);
+            }
+        }
+    };
+}
+
+
+make_slurm_wrap_struct!(JobInfo, job_info, "Information about a running job.");
 
 impl JobInfo {
      /// Get this job's ID.
      pub fn job_id(&self) -> JobId {
-         unsafe { *self.0 }.job_id
+         self.sys_data().job_id
      }
 
      /// Get the cluster partition on which this job resides.
      pub fn partition(&self) -> Cow<str> {
-         unsafe { CStr::from_ptr((*self.0).partition) }.to_string_lossy()
+         unsafe { CStr::from_ptr(self.sys_data().partition) }.to_string_lossy()
      }
 }
 
@@ -172,5 +290,114 @@ impl Deref for SingleJobInfoMessage {
 
     fn deref(&self) -> &JobInfo {
         &self.as_info
+    }
+}
+
+
+/// A connection to the Slurm accounting database.
+#[derive(Debug)]
+pub struct DatabaseConnection(*mut c_void);
+
+impl DatabaseConnection {
+    /// Connect to the Slurm database.
+    pub fn new() -> Result<Self, SlurmError> {
+        let ptr = unsafe { slurm_sys::slurmdb_connection_get() };
+
+        if ptr == 0 as _ {
+            let e = unsafe { slurm_sys::slurm_get_errno() };
+            Err(SlurmError::from_slurm(e))
+        } else {
+            Ok(DatabaseConnection(ptr))
+        }
+    }
+}
+
+
+impl Drop for DatabaseConnection {
+    fn drop(&mut self) {
+        let _ignored = unsafe { slurm_sys::slurmdb_connection_close(&mut self.0) };
+    }
+}
+
+
+/// A set of filters for identifying jobs of interest when querying the Slurm
+/// accounting database.
+#[derive(Debug)]
+pub struct JobFilters(*mut slurm_sys::slurmdb_job_cond_t);
+
+impl JobFilters {
+    fn sys_data(&self) -> &slurm_sys::slurmdb_job_cond_t {
+        unsafe { &(*self.0) }
+    }
+
+    fn sys_data_mut(&mut self) -> &mut slurm_sys::slurmdb_job_cond_t {
+        unsafe { &mut (*self.0) }
+    }
+
+    pub fn step_list(&self) -> &SlurmList<JobStepFilter> {
+        unsafe { SlurmList::transmute(&(*self.0).step_list) }
+    }
+
+    pub fn step_list_mut(&mut self) -> &mut SlurmList<JobStepFilter> {
+        unsafe { SlurmList::transmute_mut(&mut (*self.0).step_list) }
+    }
+}
+
+make_owned_version!(JobFilters, JobFiltersOwned, "An owned version of `JobFilters`");
+
+impl Default for JobFiltersOwned {
+    fn default() -> Self {
+        let mut inst = unsafe { Self::alloc_zeroed() };
+        {
+            let sdm = inst.sys_data_mut();
+            sdm.without_usage_truncation = 1;
+        }
+        inst
+    }
+}
+
+
+/// A filter for selecting jobs and job steps.
+#[derive(Copy, Clone, Debug)]
+pub struct JobStepFilter(*mut slurm_sys::slurmdb_selected_step_t);
+
+//impl JobStepFilter {
+//    /// Create a new job step filter
+//    pub fn new(jid: JobId) -> Self {
+//        JobStepFilter(slurm_sys::slurmdb_selected_step_t {
+//            array_task_id: slurm_sys::SLURMRS_NO_VAL,
+//            jobid: jid,
+//            pack_job_offset: slurm_sys::SLURMRS_NO_VAL,
+//            stepid: slurm_sys::SLURMRS_NO_VAL,
+//        })
+//    }
+//}
+
+
+/// A list of some kind of object known to Slurm.
+///
+/// These lists show up in a variety of places in the Slurm API.
+#[derive(Copy, Clone, Debug)]
+pub struct SlurmList<'a, T: 'a>(*mut slurm_sys::xlist, PhantomData<&'a T>);
+
+impl<'a, T: 'a> SlurmList<'a, T> {
+    unsafe fn destroy(&mut self) {
+        if self.0 != 0 as _ {
+            slurm_sys::slurm_list_destroy(self.0);
+            self.0 = 0 as _;
+        }
+    }
+
+    unsafe fn transmute(list: &*mut slurm_sys::xlist) -> &Self {
+        std::mem::transmute(list)
+    }
+
+    unsafe fn transmute_mut(list: &mut *mut slurm_sys::xlist) -> &mut Self {
+        std::mem::transmute(list)
+    }
+}
+
+impl<'a> SlurmList<'a, JobStepFilter> {
+    pub fn add(&mut self, value: JobStepFilter) {
     }
 }
