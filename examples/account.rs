@@ -1,7 +1,7 @@
 // Copyright 2018 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT License
 
-/*! Print out information about a job.
+/*! Demonstration of querying the Slurmdb job accounting database.
  */
 
 #[macro_use] extern crate clap;
@@ -15,7 +15,7 @@ use std::process;
 fn main() {
     let matches = App::new("rsinfo")
         .version(crate_version!())
-        .about("Print information about one job.")
+        .about("Print accounting information about one job.")
         .arg(Arg::with_name("JOBID")
              .help("The jobid of the job in question")
              .required(true)
@@ -28,7 +28,7 @@ fn main() {
         Ok(code) => code,
 
         Err(e) => {
-            eprintln!("fatal error in rsinfo");
+            eprintln!("fatal error in account");
             for cause in e.causes() {
                 eprintln!("  caused by: {}", cause);
             }
@@ -40,8 +40,13 @@ fn main() {
 
 fn inner(jobid: &str) -> Result<i32, Error> {
     let jobid = jobid.parse::<slurm::JobId>()?;
-    let info = slurm::get_job_info(jobid)?;
-    println!("Job ID: {}", info.job_id());
-    println!("Partition: {}", info.partition());
+
+    let mut filter = slurm::JobFiltersOwned::default();
+    filter.step_list_mut().append(slurm::JobStepFilterOwned::new(jobid));
+
+    let db = slurm::DatabaseConnectionOwned::new()?;
+
+    let jobs = db.get_jobs(&filter)?;
+
     Ok(0)
 }

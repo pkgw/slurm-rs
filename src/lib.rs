@@ -4,8 +4,11 @@
 /*! Interface to the Slurm workload manager.
 
 The Slurm C library uses a (primitive) custom memory allocator for its data
-structures. Because we must maintain compatibility with this allocator, it is
-not helpful to stack-allocate the various Slurm data structures.
+structures. Because we must maintain compatibility with this allocator, we
+have to allocate all of our data structures from the heap rather than the
+stack. Almost all of the structures exposed here come in both “borrowed” and
+“owned” flavors; they are largely equivalent, but only the owned versions free
+their data when they go out of scope.
 
 */
 
@@ -114,6 +117,20 @@ macro_rules! ustry {
     ($op:expr) => {
         stry!(unsafe { $op })
     }
+}
+
+/// This is like `stry!` but for unsafe Slurm calls that return pointers.
+macro_rules! pstry {
+    ($op:expr) => {{
+        let ptr = unsafe { $op };
+
+        if ptr == 0 as _ {
+            let e = unsafe { slurm_sys::slurm_get_errno() };
+            Err(SlurmError::from_slurm(e))
+        } else {
+            Ok(ptr)
+        }?
+    }}
 }
 
 
@@ -249,6 +266,9 @@ macro_rules! make_owned_version {
 }
 
 
+// The slurm list type gets custom implementations because we give it a type
+// parameter to allow typed access.
+
 /// A list of some kind of object known to Slurm.
 ///
 /// These lists show up in a variety of places in the Slurm API. As with the
@@ -266,6 +286,45 @@ impl<T> SlurmList<T> {
         std::mem::transmute(ptr)
     }
 }
+
+/// An owned version of `SlurmList`.
+#[derive(Debug)]
+pub struct SlurmListOwned<T>(SlurmList<T>);
+
+impl<T> Deref for SlurmListOwned<T> {
+    type Target = SlurmList<T>;
+
+    fn deref(&self) -> &SlurmList<T> {
+        &self.0
+    }
+}
+
+impl<T> DerefMut for SlurmListOwned<T> {
+    fn deref_mut(&mut self) -> &mut SlurmList<T> {
+        &mut self.0
+    }
+}
+
+impl<T> SlurmListOwned<T> {
+    #[allow(unused)]
+    unsafe fn give_up_ownership(mut self) -> SlurmList<T> {
+        let ptr = (self.0).0;
+        (self.0).0 = 0 as _; // ensures that slurm_free() doesn't free the memory
+        SlurmList(ptr, PhantomData)
+    }
+
+    #[allow(unused)]
+    unsafe fn assume_ownership(ptr: *mut c_void) -> Self {
+        SlurmListOwned(SlurmList(ptr as _, PhantomData))
+    }
+}
+
+impl<T> Drop for SlurmListOwned<T> {
+    fn drop(&mut self) {
+        unsafe { slurm_sys::slurm_list_destroy((self.0).0) };
+    }
+}
+
 
 // Now we can finally start wrapping types that we care about.
 
@@ -338,20 +397,23 @@ impl Drop for SingleJobInfoMessageOwned {
 
 make_slurm_wrap_struct!(DatabaseConnection, c_void, "A connection to the Slurm accounting database.");
 
+impl DatabaseConnection {
+    /// Query for information about jobs.
+    pub fn get_jobs(&self, filters: &JobFilters) -> Result<SlurmListOwned<JobRecord>, SlurmError> {
+        let ptr = pstry!(slurm_sys::slurmdb_jobs_get(self.0, filters.0));
+        Ok(unsafe { SlurmListOwned::assume_ownership(ptr as _) })
+    }
+}
+
+
 make_owned_version!(@customdrop DatabaseConnection, DatabaseConnectionOwned,
                     "An owned version of `DatabaseConnection`.");
 
 impl DatabaseConnectionOwned {
     /// Connect to the Slurm database.
     pub fn new() -> Result<Self, SlurmError> {
-        let ptr = unsafe { slurm_sys::slurmdb_connection_get() };
-
-        if ptr == 0 as _ {
-            let e = unsafe { slurm_sys::slurm_get_errno() };
-            Err(SlurmError::from_slurm(e))
-        } else {
-            Ok(unsafe { DatabaseConnectionOwned::assume_ownership(ptr) })
-        }
+        let ptr = pstry!(slurm_sys::slurmdb_connection_get());
+        Ok(unsafe { DatabaseConnectionOwned::assume_ownership(ptr) })
     }
 }
 
@@ -428,5 +490,15 @@ impl SlurmList<JobStepFilter> {
         }
 
         unsafe { slurm_sys::slurm_list_append(self.0, item.0 as _); }
+    }
+}
+
+
+make_slurm_wrap_struct!(JobRecord, slurm_sys::slurmdb_job_rec_t, "Accounting information about a job.");
+
+impl JobRecord {
+    /// Get the job's exit code.
+    pub fn exit_code(&self) -> u32 {
+        self.sys_data().exitcode
     }
 }
