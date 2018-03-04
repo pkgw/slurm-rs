@@ -133,19 +133,19 @@ impl JobInfo {
 /// While the (successful) return value of this function is not a `JobInfo`
 /// struct, it is a type that derefs to `JobInfo`, and so can be used like
 /// one.
-pub fn get_job_info(jid: JobId) -> Result<SingleJobInfoResponse, Error> {
-    let mut resp: *mut slurm_sys::job_info_msg_t = 0 as _;
+pub fn get_job_info(jid: JobId) -> Result<SingleJobInfoMessage, Error> {
+    let mut msg: *mut slurm_sys::job_info_msg_t = 0 as _;
 
-    ustry!(slurm_sys::slurm_load_job(&mut resp, jid, 0));
+    ustry!(slurm_sys::slurm_load_job(&mut msg, jid, 0));
 
-    let rc = unsafe { (*resp).record_count };
+    let rc = unsafe { (*msg).record_count };
     if rc != 1 {
         return Err(format_err!("expected exactly one info record for job {}; got {} items", jid, rc));
     }
 
-    Ok(SingleJobInfoResponse {
-        message: resp,
-        as_info: JobInfo(unsafe { (*resp).job_array }),
+    Ok(SingleJobInfoMessage {
+        message: msg,
+        as_info: JobInfo(unsafe { (*msg).job_array }),
     })
 }
 
@@ -156,18 +156,18 @@ pub fn get_job_info(jid: JobId) -> Result<SingleJobInfoResponse, Error> {
 /// treated as a `JobInfo`. Due to how the SLURM library manages memory, this
 /// separate type is necessary in some cases.
 #[derive(Debug)]
-pub struct SingleJobInfoResponse {
+pub struct SingleJobInfoMessage {
     message: *mut slurm_sys::job_info_msg_t,
     as_info: JobInfo,
 }
 
-impl Drop for SingleJobInfoResponse {
+impl Drop for SingleJobInfoMessage {
     fn drop(&mut self) {
         unsafe { slurm_sys::slurm_free_job_info_msg(self.message) };
     }
 }
 
-impl Deref for SingleJobInfoResponse {
+impl Deref for SingleJobInfoMessage {
     type Target = JobInfo;
 
     fn deref(&self) -> &JobInfo {
