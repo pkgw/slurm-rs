@@ -12,13 +12,15 @@ use std::path::PathBuf;
 fn main() {
     let slurm = pkg_config::Config::new().atleast_version("15.0").probe("slurm").unwrap();
 
+    println!("cargo:rustc-link-lib=dylib=slurmdb");
+
     let mut builder = bindgen::Builder::default()
         .header("src/wrapper.h");
 
     for ref path in &slurm.include_paths {
         builder = builder.clang_arg(format!("-I{}", path.display()));
     }
-    
+
     let bindings = builder
         .whitelist_type("slurm_.*")
         .whitelist_type("slurmdb_.*")
