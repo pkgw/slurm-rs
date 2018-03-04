@@ -28,6 +28,7 @@ fn main() {
         .whitelist_var("ESCRIPT.*")
         .whitelist_var("ESLURM.*")
         .whitelist_var("SLURMDB.*")
+        .whitelist_var("SLURMRS.*")
         .generate()
         .expect("Unable to generate bindings");
 

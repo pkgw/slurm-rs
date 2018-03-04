@@ -3,3 +3,9 @@
 
 #include <slurm/slurm.h>
 #include <slurm/slurmdb.h>
+
+/* Expose some #defines as enumeration values */
+
+enum {
+    SLURMRS_NO_VAL = NO_VAL,
+};
