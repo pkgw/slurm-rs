@@ -10,7 +10,6 @@ extern crate slurm;
 
 use clap::{Arg, App};
 use failure::Error;
-use slurm::JobInfo;
 use std::process;
 
 fn main() {
@@ -41,7 +40,7 @@ fn main() {
 
 fn inner(jobid: &str) -> Result<i32, Error> {
    let jobid = jobid.parse::<u32>()?;
-   let info = JobInfo::get_one(jobid)?;
+   let info = slurm::get_job_info(jobid)?;
    println!("Job ID: {}", info.job_id());
    println!("Partition: {}", info.partition());
    Ok(0)
