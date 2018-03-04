@@ -1,4 +1,4 @@
-// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2018 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT license.
 
 /// The version requirement here is totally made up.
@@ -20,8 +20,8 @@ fn main() {
     }
     
     let bindings = builder
-        .whitelisted_type("slurm_.*")
-        .whitelisted_function("slurm_.*")
+        .whitelist_type("slurm_.*")
+        .whitelist_function("slurm_.*")
         .generate()
         .expect("Unable to generate bindings");
 

@@ -10,5 +10,5 @@ build = "build.rs"
 license = "MIT"
 
 [build-dependencies]
-bindgen = "0.26"
+bindgen = "0.33"
 pkg-config = "^0.3"

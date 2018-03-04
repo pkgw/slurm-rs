@@ -1,4 +1,4 @@
-# Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+# Copyright 2017-2018 Peter Williams <peter@newton.cx> and collaborators
 # Licensed under the MIT licene.
 
 [package]
@@ -10,5 +10,7 @@ license = "MIT"
 [workspace]
 
 [dependencies]
+clap = "2.30"
+failure = "0.1"
 slurm-sys = { path = "slurm-sys" }
 
