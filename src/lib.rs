@@ -161,6 +161,23 @@ macro_rules! make_slurm_wrap_struct {
             fn sys_data_mut(&mut self) -> &mut slurm_sys::$slurm_name {
                 unsafe { &mut (*self.0) }
             }
+
+            /// Transmute a reference to a pointer to the underlying datatype
+            /// into a reference to this wrapper struct. This leverages the
+            /// fact that the wrapper type is a unit struct that is basically
+            /// just a pointer itself. This function allows us to return
+            /// references to fields of various `slurm_sys` structs as if
+            /// they were our Rust wrapper types.
+            #[allow(unused)]
+            unsafe fn transmute_ptr<'a>(ptr: &'a *mut slurm_sys::$slurm_name) -> &'a Self {
+                std::mem::transmute(ptr)
+            }
+
+            /// Like `transmute_ptr`, but mutable.
+            #[allow(unused)]
+            unsafe fn transmute_ptr_mut<'a>(ptr: &'a mut *mut slurm_sys::$slurm_name) -> &'a mut Self {
+                std::mem::transmute(ptr)
+            }
         }
     }
 }
@@ -228,6 +245,17 @@ macro_rules! make_owned_version {
 }
 
 
+/// A list of some kind of object known to Slurm.
+///
+/// These lists show up in a variety of places in the Slurm API. As with the
+/// other core structures exposed by this crate, this type represents a
+/// *borrowed* reference to a list.
+#[derive(Debug)]
+pub struct SlurmList<T>(*mut slurm_sys::xlist, PhantomData<T>);
+
+
+// Now we can finally start wrapping types that we care about.
+
 make_slurm_wrap_struct!(JobInfo, job_info, "Information about a running job.");
 
 impl JobInfo {
@@ -251,7 +279,7 @@ impl JobInfo {
 /// While the (successful) return value of this function is not a `JobInfo`
 /// struct, it is a type that derefs to `JobInfo`, and so can be used like
 /// one.
-pub fn get_job_info(jid: JobId) -> Result<SingleJobInfoMessage, Error> {
+pub fn get_job_info(jid: JobId) -> Result<SingleJobInfoMessageOwned, Error> {
     let mut msg: *mut slurm_sys::job_info_msg_t = 0 as _;
 
     ustry!(slurm_sys::slurm_load_job(&mut msg, jid, 0));
@@ -261,35 +289,36 @@ pub fn get_job_info(jid: JobId) -> Result<SingleJobInfoMessage, Error> {
         return Err(format_err!("expected exactly one info record for job {}; got {} items", jid, rc));
     }
 
-    Ok(SingleJobInfoMessage {
-        message: msg,
-        as_info: JobInfo(unsafe { (*msg).job_array }),
-    })
+    Ok(unsafe { SingleJobInfoMessageOwned::assume_ownership(msg as _) })
 }
 
 
-/// Information about a single job.
-///
-/// This type implements `Deref` to `JobInfo` and so can be essentially be
-/// treated as a `JobInfo`. Due to how the Slurm library manages memory, this
-/// separate type is necessary in some cases.
-#[derive(Debug)]
-pub struct SingleJobInfoMessage {
-    message: *mut slurm_sys::job_info_msg_t,
-    as_info: JobInfo,
-}
+make_slurm_wrap_struct!(SingleJobInfoMessage, job_info_msg_t, "Information about a single job.
 
-impl Drop for SingleJobInfoMessage {
-    fn drop(&mut self) {
-        unsafe { slurm_sys::slurm_free_job_info_msg(self.message) };
-    }
-}
+This type implements `Deref` to `JobInfo` and so can be essentially be
+treated as a `JobInfo`. Due to how the Slurm library manages memory, this
+separate type is necessary in some cases.");
 
 impl Deref for SingleJobInfoMessage {
     type Target = JobInfo;
 
     fn deref(&self) -> &JobInfo {
-        &self.as_info
+        unsafe { JobInfo::transmute_ptr(&self.sys_data().job_array) }
+    }
+}
+
+impl DerefMut for SingleJobInfoMessage {
+    fn deref_mut(&mut self) -> &mut JobInfo {
+        unsafe { JobInfo::transmute_ptr_mut(&mut self.sys_data_mut().job_array) }
+    }
+}
+
+make_owned_version!(@customdrop SingleJobInfoMessage, SingleJobInfoMessageOwned,
+                    "An owned version of `SingleJobInfoMessage`.");
+
+impl Drop for SingleJobInfoMessageOwned {
+    fn drop(&mut self) {
+        unsafe { slurm_sys::slurm_free_job_info_msg((self.0).0) };
     }
 }
 
@@ -334,13 +363,13 @@ impl JobFilters {
         unsafe { &mut (*self.0) }
     }
 
-    pub fn step_list(&self) -> &SlurmList<JobStepFilter> {
-        unsafe { SlurmList::transmute(&(*self.0).step_list) }
-    }
-
-    pub fn step_list_mut(&mut self) -> &mut SlurmList<JobStepFilter> {
-        unsafe { SlurmList::transmute_mut(&mut (*self.0).step_list) }
-    }
+    //pub fn step_list(&self) -> &SlurmList<JobStepFilter> {
+    //    unsafe { SlurmList::transmute(&(*self.0).step_list) }
+    //}
+    //
+    //pub fn step_list_mut(&mut self) -> &mut SlurmList<JobStepFilter> {
+    //    unsafe { SlurmList::transmute_mut(&mut (*self.0).step_list) }
+    //}
 }
 
 make_owned_version!(JobFilters, JobFiltersOwned, "An owned version of `JobFilters`");
@@ -372,32 +401,3 @@ pub struct JobStepFilter(*mut slurm_sys::slurmdb_selected_step_t);
 //        })
 //    }
 //}
-
-
-/// A list of some kind of object known to Slurm.
-///
-/// These lists show up in a variety of places in the Slurm API.
-#[derive(Copy, Clone, Debug)]
-pub struct SlurmList<'a, T: 'a>(*mut slurm_sys::xlist, PhantomData<&'a T>);
-
-impl<'a, T: 'a> SlurmList<'a, T> {
-    unsafe fn destroy(&mut self) {
-        if self.0 != 0 as _ {
-            slurm_sys::slurm_list_destroy(self.0);
-            self.0 = 0 as _;
-        }
-    }
-
-    unsafe fn transmute(list: &*mut slurm_sys::xlist) -> &Self {
-        std::mem::transmute(list)
-    }
-
-    unsafe fn transmute_mut(list: &mut *mut slurm_sys::xlist) -> &mut Self {
-        std::mem::transmute(list)
-    }
-}
-
-impl<'a> SlurmList<'a, JobStepFilter> {
-    pub fn add(&mut self, value: JobStepFilter) {
-    }
-}
