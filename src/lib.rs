@@ -155,6 +155,14 @@ fn slurm_free<T>(thing: &mut *mut T) {
 }
 
 
+/// A helper trait that lets us generically iterate over lists. It must be
+/// public so that we can expose `Iterator` for `SlurmListIteratorOwned`.
+pub trait UnownedFromSlurmPointer {
+    /// Create an unowned wrapper object from a Slurm pointer.
+    fn unowned_from_slurm_pointer(ptr: *mut c_void) -> Self;
+}
+
+
 /// Helper for creating public structs that directly wrap Slurm API
 /// structures. Because we must use Slurm's internal allocator, these all wrap
 /// native pointers. It's a bit annoying but as far as I can tell it's what we
@@ -198,6 +206,13 @@ macro_rules! make_slurm_wrap_struct {
             #[inline(always)]
             unsafe fn transmute_ptr_mut<'a>(ptr: &'a mut *mut $slurm_name) -> &'a mut Self {
                 std::mem::transmute(ptr)
+            }
+        }
+
+        impl UnownedFromSlurmPointer for $rust_name {
+            #[inline(always)]
+            fn unowned_from_slurm_pointer(ptr: *mut c_void) -> Self {
+                $rust_name(ptr as _)
             }
         }
     }
@@ -287,6 +302,18 @@ impl<T> SlurmList<T> {
     }
 }
 
+impl<T: UnownedFromSlurmPointer> SlurmList<T> {
+    pub fn iter<'a>(&'a self) -> SlurmListIteratorOwned<'a, T> {
+        let ptr = unsafe { slurm_sys::slurm_list_iterator_create(self.0) };
+
+        if ptr == 0 as _ {
+            panic!("failed to create list iterator");
+        }
+
+        SlurmListIteratorOwned(ptr as _, PhantomData)
+    }
+}
+
 /// An owned version of `SlurmList`.
 #[derive(Debug)]
 pub struct SlurmListOwned<T>(SlurmList<T>);
@@ -322,6 +349,31 @@ impl<T> SlurmListOwned<T> {
 impl<T> Drop for SlurmListOwned<T> {
     fn drop(&mut self) {
         unsafe { slurm_sys::slurm_list_destroy((self.0).0) };
+    }
+}
+
+
+// Likewise for iterating through lists, except the iterators are always owned
+#[derive(Debug)]
+pub struct SlurmListIteratorOwned<'a, T: 'a + UnownedFromSlurmPointer>(*mut slurm_sys::listIterator, PhantomData<&'a T>);
+
+impl<'a, T: 'a + UnownedFromSlurmPointer> Drop for SlurmListIteratorOwned<'a, T> {
+    fn drop(&mut self) {
+        unsafe { slurm_sys::slurm_list_iterator_destroy(self.0) };
+    }
+}
+
+impl<'a, T: 'a + UnownedFromSlurmPointer> Iterator for SlurmListIteratorOwned<'a, T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<T> {
+        let ptr = unsafe { slurm_sys::slurm_list_next(self.0) };
+
+        if ptr == 0 as _ {
+            None
+        } else {
+            Some(T::unowned_from_slurm_pointer(ptr))
+        }
     }
 }
 
@@ -497,8 +549,18 @@ impl SlurmList<JobStepFilter> {
 make_slurm_wrap_struct!(JobRecord, slurm_sys::slurmdb_job_rec_t, "Accounting information about a job.");
 
 impl JobRecord {
+    /// Get the job's ID number.
+    pub fn job_id(&self) -> JobId {
+        self.sys_data().jobid
+    }
+
     /// Get the job's exit code.
     pub fn exit_code(&self) -> u32 {
         self.sys_data().exitcode
+    }
+
+    /// Get the job's name.
+    pub fn job_name(&self) -> Cow<str> {
+         unsafe { CStr::from_ptr(self.sys_data().jobname) }.to_string_lossy()
     }
 }
