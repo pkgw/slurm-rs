@@ -12,10 +12,12 @@ their data when they go out of scope.
 
 */
 
+extern crate chrono;
 #[macro_use] extern crate failure;
 #[macro_use] extern crate failure_derive;
 extern crate slurm_sys;
 
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use failure::Error;
 use std::borrow::Cow;
 use std::default::Default;
@@ -549,9 +551,14 @@ impl SlurmList<JobStepFilter> {
 make_slurm_wrap_struct!(JobRecord, slurm_sys::slurmdb_job_rec_t, "Accounting information about a job.");
 
 impl JobRecord {
-    /// Get the job's ID number.
-    pub fn job_id(&self) -> JobId {
-        self.sys_data().jobid
+    /// Get the job's "eligible" time.
+    pub fn eligible_time(&self) -> DateTime<Utc> {
+        Utc.timestamp(self.sys_data().eligible as i64, 0)
+    }
+
+    /// Get the job's end time.
+    pub fn end_time(&self) -> DateTime<Utc> {
+        Utc.timestamp(self.sys_data().end as i64, 0)
     }
 
     /// Get the job's exit code.
@@ -559,8 +566,33 @@ impl JobRecord {
         self.sys_data().exitcode
     }
 
+    /// Get the job's ID number.
+    pub fn job_id(&self) -> JobId {
+        self.sys_data().jobid
+    }
+
     /// Get the job's name.
     pub fn job_name(&self) -> Cow<str> {
          unsafe { CStr::from_ptr(self.sys_data().jobname) }.to_string_lossy()
+    }
+
+    /// Get the job's start time.
+    pub fn start_time(&self) -> DateTime<Utc> {
+        Utc.timestamp(self.sys_data().start as i64, 0)
+    }
+
+    /// Get the job's submission time.
+    pub fn submit_time(&self) -> DateTime<Utc> {
+        Utc.timestamp(self.sys_data().submit as i64, 0)
+    }
+
+    /// Get the wallclock time spent waiting for the job to start.
+    pub fn wait_duration(&self) -> Duration {
+        self.start_time().signed_duration_since(self.submit_time())
+    }
+
+    /// Get the wallclock time taken by the job: end time minus start time.
+    pub fn wallclock_duration(&self) -> Duration {
+        self.end_time().signed_duration_since(self.start_time())
     }
 }

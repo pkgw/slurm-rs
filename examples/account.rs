@@ -48,7 +48,8 @@ fn inner(jobid: &str) -> Result<i32, Error> {
     let jobs = db.get_jobs(&filter)?;
 
     for job in jobs.iter() {
-        println!("{} {} {}", job.job_id(), job.job_name(), job.exit_code());
+        println!("{} {} {} wait: {} wallclock: {}", job.job_id(), job.job_name(), job.exit_code(),
+                 job.wait_duration().num_seconds(), job.wallclock_duration().num_seconds());
     }
 
     Ok(0)
