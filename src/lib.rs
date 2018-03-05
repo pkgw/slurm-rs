@@ -596,3 +596,30 @@ impl JobRecord {
         self.end_time().signed_duration_since(self.start_time())
     }
 }
+
+
+make_slurm_wrap_struct!(JobDescriptor, slurm_sys::job_descriptor,
+                        "A description of a batch job to submit");
+
+make_owned_version!(@customdrop JobDescriptor, JobDescriptorOwned, "An owned version of `JobDescriptor`.");
+
+impl JobDescriptorOwned {
+    /// Create a new, defaulted job descriptor.
+    pub fn new() -> Self {
+        let inst = unsafe { Self::alloc_zeroed() };
+        unsafe { slurm_sys::slurm_init_job_desc_msg((inst.0).0); }
+        inst
+    }
+}
+
+impl Drop for JobDescriptorOwned {
+    fn drop(&mut self) {
+        // TODO: `slurm_init_job_desc_msg` doesn't allocate any
+        // sub-structures, but we will probably end up wanting to set various
+        // strings that will end up needing deallocation here.
+        slurm_free(&mut (self.0).0);
+    }
+}
+
+
+// submit_response_msg_t
