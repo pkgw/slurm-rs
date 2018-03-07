@@ -551,19 +551,28 @@ impl SlurmList<JobStepFilter> {
 make_slurm_wrap_struct!(JobRecord, slurm_sys::slurmdb_job_rec_t, "Accounting information about a job.");
 
 impl JobRecord {
-    /// Get the job's "eligible" time.
-    pub fn eligible_time(&self) -> DateTime<Utc> {
-        Utc.timestamp(self.sys_data().eligible as i64, 0)
+    /// Get the job's "eligible" time, or None if the job is not yet eligible to run.
+    pub fn eligible_time(&self) -> Option<DateTime<Utc>> {
+        match self.sys_data().eligible as i64 {
+            0 => None,
+            t => Some(Utc.timestamp(t, 0)),
+        }
     }
 
-    /// Get the job's end time.
-    pub fn end_time(&self) -> DateTime<Utc> {
-        Utc.timestamp(self.sys_data().end as i64, 0)
+    /// Get the job's end time, or None if the job has not yet ended.
+    pub fn end_time(&self) -> Option<DateTime<Utc>> {
+        match self.sys_data().end as i64 {
+            0 => None,
+            t => Some(Utc.timestamp(t, 0)),
+        }
     }
 
-    /// Get the job's exit code.
-    pub fn exit_code(&self) -> u32 {
-        self.sys_data().exitcode
+    /// Get the job's exit code, or None if the job has not yet ended.
+    pub fn exit_code(&self) -> Option<u32> {
+        match self.sys_data().end as i64 {
+            0 => None,
+            _ => Some(self.sys_data().exitcode),
+        }
     }
 
     /// Get the job's ID number.
@@ -576,9 +585,12 @@ impl JobRecord {
          unsafe { CStr::from_ptr(self.sys_data().jobname) }.to_string_lossy()
     }
 
-    /// Get the job's start time.
-    pub fn start_time(&self) -> DateTime<Utc> {
-        Utc.timestamp(self.sys_data().start as i64, 0)
+    /// Get the job's start time, or None if the job has not yet started.
+    pub fn start_time(&self) -> Option<DateTime<Utc>> {
+        match self.sys_data().start as i64 {
+            0 => None,
+            t => Some(Utc.timestamp(t, 0)),
+        }
     }
 
     /// Get the job's submission time.
@@ -586,14 +598,19 @@ impl JobRecord {
         Utc.timestamp(self.sys_data().submit as i64, 0)
     }
 
-    /// Get the wallclock time spent waiting for the job to start.
-    pub fn wait_duration(&self) -> Duration {
-        self.start_time().signed_duration_since(self.submit_time())
+    /// Get the wallclock time spent waiting for the job to start, or None
+    /// if the job has not yet started.
+    pub fn wait_duration(&self) -> Option<Duration> {
+        self.start_time().map(|t| t.signed_duration_since(self.submit_time()))
     }
 
     /// Get the wallclock time taken by the job: end time minus start time.
-    pub fn wallclock_duration(&self) -> Duration {
-        self.end_time().signed_duration_since(self.start_time())
+    /// Returns None if the job has not yet completed (or even started).
+    pub fn wallclock_duration(&self) -> Option<Duration> {
+        match (self.start_time(), self.end_time()) {
+            (Some(start), Some(end)) => Some(end.signed_duration_since(start)),
+            _ => None,
+        }
     }
 }
 

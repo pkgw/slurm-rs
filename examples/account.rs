@@ -48,8 +48,20 @@ fn inner(jobid: &str) -> Result<i32, Error> {
     let jobs = db.get_jobs(&filter)?;
 
     for job in jobs.iter() {
-        println!("{} {} {} wait: {} wallclock: {}", job.job_id(), job.job_name(), job.exit_code(),
-                 job.wait_duration().num_seconds(), job.wallclock_duration().num_seconds());
+        println!("{} {}", job.job_id(), job.job_name());
+
+        if let Some(d) = job.wait_duration() {
+            println!("  wait time: {} s", d.num_seconds());
+        } else {
+            println!("  still waiting to start");
+        }
+
+        if let Some(d) = job.wallclock_duration() {
+            println!("  wallclock runtime: {} s", d.num_seconds());
+            println!("  exit code: {}", job.exit_code().unwrap());
+        } else {
+            println!("  job has not yet finished");
+        }
     }
 
     Ok(0)
