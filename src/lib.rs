@@ -8,7 +8,9 @@ structures. Because we must maintain compatibility with this allocator, we
 have to allocate all of our data structures from the heap rather than the
 stack. Almost all of the structures exposed here come in both “borrowed” and
 “owned” flavors; they are largely equivalent, but only the owned versions free
-their data when they go out of scope.
+their data when they go out of scope. Borrowed structures need not be
+immutable, but it is not possible to modify them in ways that require freeing
+or allocating memory associated with their sub-structures.
 
 */
 
