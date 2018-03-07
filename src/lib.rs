@@ -405,7 +405,128 @@ impl<'a, T: 'a + UnownedFromSlurmPointer> Iterator for SlurmListIteratorOwned<'a
 
 // Now we can finally start wrapping types that we care about.
 
-make_slurm_wrap_struct!(JobInfo, slurm_sys::job_info, "Information about a running job.");
+make_slurm_wrap_struct!(JobInfo, slurm_sys::job_info, "\
+Information about a running job.
+
+The following items in the Slurm API are *not* exposed in these Rust bindings:
+
+```
+pub struct job_info {
+    pub account: *mut c_char,
+    pub admin_comment: *mut c_char,
+    pub alloc_node: *mut c_char,
+    pub alloc_sid: u32,
+    pub array_bitmap: *mut c_void,
+    pub array_job_id: u32,
+    pub array_task_id: u32,
+    pub array_max_tasks: u32,
+    pub array_task_str: *mut c_char,
+    pub assoc_id: u32,
+    pub batch_flag: u16,
+    pub batch_host: *mut c_char,
+    pub bitflags: u32,
+    pub boards_per_node: u16,
+    pub burst_buffer: *mut c_char,
+    pub burst_buffer_state: *mut c_char,
+    pub cluster: *mut c_char,
+    pub cluster_features: *mut c_char,
+    pub command: *mut c_char,
+    pub comment: *mut c_char,
+    pub contiguous: u16,
+    pub core_spec: u16,
+    pub cores_per_socket: u16,
+    pub billable_tres: f64,
+    pub cpus_per_task: u16,
+    pub cpu_freq_min: u32,
+    pub cpu_freq_max: u32,
+    pub cpu_freq_gov: u32,
+    pub deadline: time_t,
+    pub delay_boot: u32,
+    pub dependency: *mut c_char,
+    pub derived_ec: u32,
+    pub eligible_time: time_t,
+    pub end_time: time_t,
+    pub exc_nodes: *mut c_char,
+    pub exc_node_inx: *mut i32,
+    pub exit_code: u32,
+    pub features: *mut c_char,
+    pub fed_origin_str: *mut c_char,
+    pub fed_siblings_active: u64,
+    pub fed_siblings_active_str: *mut c_char,
+    pub fed_siblings_viable: u64,
+    pub fed_siblings_viable_str: *mut c_char,
+    pub gres: *mut c_char,
+    pub gres_detail_cnt: u32,
+    pub gres_detail_str: *mut *mut c_char,
+    pub group_id: u32,
+    pub job_resrcs: *mut job_resources_t,
+    pub job_state: u32,
+    pub last_sched_eval: time_t,
+    pub licenses: *mut c_char,
+    pub max_cpus: u32,
+    pub max_nodes: u32,
+    pub mcs_label: *mut c_char,
+    pub name: *mut c_char,
+    pub network: *mut c_char,
+    pub nodes: *mut c_char,
+    pub nice: u32,
+    pub node_inx: *mut i32,
+    pub ntasks_per_core: u16,
+    pub ntasks_per_node: u16,
+    pub ntasks_per_socket: u16,
+    pub ntasks_per_board: u16,
+    pub num_cpus: u32,
+    pub num_nodes: u32,
+    pub num_tasks: u32,
+    pub pack_job_id: u32,
+    pub pack_job_id_set: *mut c_char,
+    pub pack_job_offset: u32,
+    pub pn_min_memory: u64,
+    pub pn_min_cpus: u16,
+    pub pn_min_tmp_disk: u32,
+    pub power_flags: u8,
+    pub preempt_time: time_t,
+    pub pre_sus_time: time_t,
+    pub priority: u32,
+    pub profile: u32,
+    pub qos: *mut c_char,
+    pub reboot: u8,
+    pub req_nodes: *mut c_char,
+    pub req_node_inx: *mut i32,
+    pub req_switch: u32,
+    pub requeue: u16,
+    pub resize_time: time_t,
+    pub restart_cnt: u16,
+    pub resv_name: *mut c_char,
+    pub sched_nodes: *mut c_char,
+    pub select_jobinfo: *mut dynamic_plugin_data_t,
+    pub shared: u16,
+    pub show_flags: u16,
+    pub sockets_per_board: u16,
+    pub sockets_per_node: u16,
+    pub start_time: time_t,
+    pub start_protocol_ver: u16,
+    pub state_desc: *mut c_char,
+    pub state_reason: u16,
+    pub std_err: *mut c_char,
+    pub std_in: *mut c_char,
+    pub std_out: *mut c_char,
+    pub submit_time: time_t,
+    pub suspend_time: time_t,
+    pub time_limit: u32,
+    pub time_min: u32,
+    pub threads_per_core: u16,
+    pub tres_req_str: *mut c_char,
+    pub tres_alloc_str: *mut c_char,
+    pub user_id: u32,
+    pub user_name: *mut c_char,
+    pub wait4switch: u32,
+    pub wckey: *mut c_char,
+    pub work_dir: *mut c_char,
+}
+```
+
+");
 
 impl JobInfo {
      /// Get this job's ID.
@@ -503,9 +624,44 @@ impl Drop for DatabaseConnectionOwned {
 }
 
 
-make_slurm_wrap_struct!(JobFilters, slurm_sys::slurmdb_job_cond_t, "A set of
-                        filters for identifying jobs of interest when querying
-                        the Slurm accounting database.");
+make_slurm_wrap_struct!(JobFilters, slurm_sys::slurmdb_job_cond_t, "\
+A set of filters for identifying jobs of interest when querying the Slurm
+accounting database.
+
+The following items in the Slurm API are *not* exposed in these Rust bindings:
+
+```
+pub struct slurmdb_job_cond_t {
+    pub acct_list: List,
+    pub associd_list: List,
+    pub cluster_list: List,
+    pub cpus_max: u32,
+    pub cpus_min: u32,
+    pub duplicates: u16,
+    pub exitcode: i32,
+    pub format_list: List,
+    pub groupid_list: List,
+    pub jobname_list: List,
+    pub nodes_max: u32,
+    pub nodes_min: u32,
+    pub partition_list: List,
+    pub qos_list: List,
+    pub resv_list: List,
+    pub resvid_list: List,
+    pub state_list: List,
+    pub timelimit_max: u32,
+    pub timelimit_min: u32,
+    pub usage_end: time_t,
+    pub usage_start: time_t,
+    pub used_nodes: *mut c_char,
+    pub userid_list: List,
+    pub wckey_list: List,
+    pub without_steps: u16,
+    pub without_usage_truncation: u16,
+}
+```
+
+");
 
 impl JobFilters {
     pub fn step_list(&self) -> &SlurmList<JobStepFilter> {
@@ -571,7 +727,67 @@ impl SlurmList<JobStepFilter> {
 }
 
 
-make_slurm_wrap_struct!(JobRecord, slurm_sys::slurmdb_job_rec_t, "Accounting information about a job.");
+make_slurm_wrap_struct!(JobRecord, slurm_sys::slurmdb_job_rec_t, "\
+Accounting information about a job.
+
+The following items in the Slurm API are *not* exposed in these Rust bindings:
+
+```
+pub struct slurmdb_job_rec_t {
+    pub account: *mut c_char,
+    pub admin_comment: *mut c_char,
+    pub alloc_gres: *mut c_char,
+    pub alloc_nodes: u32,
+    pub array_job_id: u32,
+    pub array_max_tasks: u32,
+    pub array_task_id: u32,
+    pub array_task_str: *mut c_char,
+    pub associd: u32,
+    pub blockid: *mut c_char,
+    pub cluster: *mut c_char,
+    pub derived_ec: u32,
+    pub derived_es: *mut c_char,
+    pub elapsed: u32,
+    pub first_step_ptr: *mut c_void,
+    pub gid: u32,
+    pub lft: u32,
+    pub mcs_label: *mut c_char,
+    pub nodes: *mut c_char,
+    pub partition: *mut c_char,
+    pub pack_job_id: u32,
+    pub pack_job_offset: u32,
+    pub priority: u32,
+    pub qosid: u32,
+    pub req_cpus: u32,
+    pub req_gres: *mut c_char,
+    pub req_mem: u64,
+    pub requid: u32,
+    pub resvid: u32,
+    pub resv_name: *mut c_char,
+    pub show_full: u32,
+    pub state: u32,
+    pub stats: slurmdb_stats_t,
+    pub steps: List,
+    pub suspended: u32,
+    pub sys_cpu_sec: u32,
+    pub sys_cpu_usec: u32,
+    pub timelimit: u32,
+    pub tot_cpu_sec: u32,
+    pub tot_cpu_usec: u32,
+    pub track_steps: u16,
+    pub tres_alloc_str: *mut c_char,
+    pub tres_req_str: *mut c_char,
+    pub uid: u32,
+    pub used_gres: *mut c_char,
+    pub user: *mut c_char,
+    pub user_cpu_sec: u32,
+    pub user_cpu_usec: u32,
+    pub wckey: *mut c_char,
+    pub wckeyid: u32,
+    pub work_dir: *mut c_char,
+}
+```
+");
 
 impl JobRecord {
     /// Get the job's "eligible" time, or None if the job is not yet eligible to run.
@@ -638,8 +854,132 @@ impl JobRecord {
 }
 
 
-make_slurm_wrap_struct!(JobDescriptor, slurm_sys::job_descriptor,
-                        "A description of a batch job to submit");
+make_slurm_wrap_struct!(JobDescriptor, slurm_sys::job_descriptor, "\
+A description of a batch job to submit.
+
+The following items in the Slurm API are *not* exposed in these Rust bindings:
+
+```
+pub struct job_descriptor {
+    pub account: *mut c_char,
+    pub acctg_freq: *mut c_char,
+    pub admin_comment: *mut c_char,
+    pub alloc_node: *mut c_char,
+    pub alloc_resp_port: u16,
+    pub alloc_sid: u32,
+    pub array_inx: *mut c_char,
+    pub array_bitmap: *mut c_void,
+    pub begin_time: time_t,
+    pub bitflags: u32,
+    pub burst_buffer: *mut c_char,
+    pub ckpt_interval: u16,
+    pub ckpt_dir: *mut c_char,
+    pub clusters: *mut c_char,
+    pub cluster_features: *mut c_char,
+    pub comment: *mut c_char,
+    pub contiguous: u16,
+    pub core_spec: u16,
+    pub cpu_bind: *mut c_char,
+    pub cpu_bind_type: u16,
+    pub cpu_freq_min: u32,
+    pub cpu_freq_max: u32,
+    pub cpu_freq_gov: u32,
+    pub deadline: time_t,
+    pub delay_boot: u32,
+    pub dependency: *mut c_char,
+    pub end_time: time_t,
+    pub environment: *mut *mut c_char,
+    pub env_size: u32,
+    pub extra: *mut c_char,
+    pub exc_nodes: *mut c_char,
+    pub features: *mut c_char,
+    pub fed_siblings_active: u64,
+    pub fed_siblings_viable: u64,
+    pub gres: *mut c_char,
+    pub group_id: u32,
+    pub immediate: u16,
+    pub job_id: u32,
+    pub job_id_str: *mut c_char,
+    pub kill_on_node_fail: u16,
+    pub licenses: *mut c_char,
+    pub mail_type: u16,
+    pub mail_user: *mut c_char,
+    pub mcs_label: *mut c_char,
+    pub mem_bind: *mut c_char,
+    pub mem_bind_type: u16,
+    pub name: *mut c_char,
+    pub network: *mut c_char,
+    pub nice: u32,
+    pub num_tasks: u32,
+    pub open_mode: u8,
+    pub origin_cluster: *mut c_char,
+    pub other_port: u16,
+    pub overcommit: u8,
+    pub pack_job_offset: u32,
+    pub partition: *mut c_char,
+    pub plane_size: u16,
+    pub power_flags: u8,
+    pub priority: u32,
+    pub profile: u32,
+    pub qos: *mut c_char,
+    pub reboot: u16,
+    pub resp_host: *mut c_char,
+    pub restart_cnt: u16,
+    pub req_nodes: *mut c_char,
+    pub requeue: u16,
+    pub reservation: *mut c_char,
+    pub script: *mut c_char,
+    pub shared: u16,
+    pub spank_job_env: *mut *mut c_char,
+    pub spank_job_env_size: u32,
+    pub task_dist: u32,
+    pub time_limit: u32,
+    pub time_min: u32,
+    pub user_id: u32,
+    pub wait_all_nodes: u16,
+    pub warn_flags: u16,
+    pub warn_signal: u16,
+    pub warn_time: u16,
+    pub work_dir: *mut c_char,
+    pub cpus_per_task: u16,
+    pub min_cpus: u32,
+    pub max_cpus: u32,
+    pub min_nodes: u32,
+    pub max_nodes: u32,
+    pub boards_per_node: u16,
+    pub sockets_per_board: u16,
+    pub sockets_per_node: u16,
+    pub cores_per_socket: u16,
+    pub threads_per_core: u16,
+    pub ntasks_per_node: u16,
+    pub ntasks_per_socket: u16,
+    pub ntasks_per_core: u16,
+    pub ntasks_per_board: u16,
+    pub pn_min_cpus: u16,
+    pub pn_min_memory: u64,
+    pub pn_min_tmp_disk: u32,
+    pub geometry: [u16; 5],
+    pub conn_type: [u16; 5],
+    pub rotate: u16,
+    pub blrtsimage: *mut c_char,
+    pub linuximage: *mut c_char,
+    pub mloaderimage: *mut c_char,
+    pub ramdiskimage: *mut c_char,
+    pub req_switch: u32,
+    pub select_jobinfo: *mut dynamic_plugin_data_t,
+    pub std_err: *mut c_char,
+    pub std_in: *mut c_char,
+    pub std_out: *mut c_char,
+    pub tres_req_cnt: *mut u64,
+    pub wait4switch: u32,
+    pub wckey: *mut c_char,
+    pub x11: u16,
+    pub x11_magic_cookie: *mut c_char,
+    pub x11_target_port: u16,
+}
+```
+
+");
 
 make_owned_version!(@customdrop JobDescriptor, JobDescriptorOwned, "An owned version of `JobDescriptor`.");
 
