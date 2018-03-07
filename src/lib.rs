@@ -1035,4 +1035,42 @@ impl Drop for JobDescriptorOwned {
 }
 
 
-// submit_response_msg_t
+make_slurm_wrap_struct!(SubmitResponseMessage, slurm_sys::submit_response_msg, "\
+Information returned by Slurm upon job submission.
+");
+
+impl SubmitResponseMessage {
+    /// Get the job ID of the new job.
+    ///
+    /// TODO: option depending on error code?
+    pub fn job_id(&self) -> JobId {
+        self.sys_data().job_id
+    }
+
+    /// Get the job-step ID of the new job.
+    ///
+    /// TODO: option depending on error code?
+    pub fn step_id(&self) -> StepId {
+        self.sys_data().step_id
+    }
+
+    /// Get the error code returned by the server.
+    pub fn error_code(&self) -> u32 {
+        self.sys_data().error_code
+    }
+
+    /// Get the "user message" returned by the server.
+    ///
+    /// I think this is arbitrary text that should be shown to the user?
+    pub fn user_message(&self) -> Cow<str> {
+         unsafe { CStr::from_ptr(self.sys_data().job_submit_user_msg) }.to_string_lossy()
+    }
+}
+
+make_owned_version!(@customdrop SubmitResponseMessage, SubmitResponseMessageOwned, "An owned version of `SubmitResponseMessage`.");
+
+impl Drop for SubmitResponseMessageOwned {
+    fn drop(&mut self) {
+        unsafe { slurm_sys::slurm_free_submit_response_response_msg((self.0).0 as _) };
+    }
+}
