@@ -25,7 +25,7 @@ use std::ffi::CStr;
 use std::fmt::{Display, Error as FmtError, Formatter};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
-use std::os::raw::{c_int, c_void};
+use std::os::raw::{c_char, c_int, c_void};
 
 
 /// A job identifier number; this will always be `u32`.
@@ -169,6 +169,24 @@ fn slurm_alloc_utf8_string<S: AsRef<str>>(s: S) -> *mut u8 {
 }
 
 
+/// Allocate an array of C-style strings using Slurm's allocator.
+///
+/// The strings are encoded as UTF8. Returns the pointer to the string array
+/// and the number of strings allocated, which may not be known by the caller
+/// if the argument is an iterator of indeterminate size.
+fn slurm_alloc_utf8_string_array<I: IntoIterator<Item = S>, S: AsRef<str>>(strings: I) -> (*mut *mut c_char, usize) {
+    let buf: Vec<_> = strings.into_iter().collect();
+    let ptr = slurm_alloc_array(buf.len());
+    let sl = unsafe { std::slice::from_raw_parts_mut(ptr, buf.len()) };
+
+    for (i, s) in buf.iter().enumerate() {
+        sl[i] = slurm_alloc_utf8_string(s.as_ref()) as _;
+    }
+
+    (ptr, buf.len())
+}
+
+
 /// Free a structure using Slurm's allocator.
 ///
 /// A mutable reference to the pointer is required; after freeing, the pointer
@@ -177,6 +195,25 @@ fn slurm_free<T>(thing: &mut *mut T) {
     const TEXT: &[u8] = b"slurm-rs\0";
     let p = &mut (*thing as *mut c_void);
     unsafe { slurm_sys::slurm_xfree(p, TEXT.as_ptr() as _, 1, TEXT.as_ptr() as _) };
+}
+
+
+/// Free an array of strings allocated through Slurm's allocator.
+///
+/// A mutable reference to the pointer is required; after freeing, the pointer
+/// is nullified. This call is a no-op if the input pointer is already null.
+fn slurm_free_string_array(ptr_ref: &mut *mut *mut c_char, count: usize) {
+    if ptr_ref.is_null() {
+        return;
+    }
+
+    let sl = unsafe { std::slice::from_raw_parts_mut(*ptr_ref, count) };
+
+    for mut sub_ptr in sl {
+        slurm_free(&mut sub_ptr);
+    }
+
+    slurm_free(ptr_ref);
 }
 
 
@@ -1004,43 +1041,54 @@ impl JobDescriptorOwned {
 
     fn maybe_clear_argv(&mut self) {
         let d = self.sys_data_mut();
-
-        if d.argv.is_null() {
-            return;
-        }
-
-        let args = unsafe { std::slice::from_raw_parts_mut(d.argv, d.argc as usize) };
-        for mut ptr in args {
-            slurm_free(&mut ptr);
-        }
-
-        slurm_free(&mut d.argv);
+        slurm_free_string_array(&mut d.argv, d.argc as usize);
         d.argc = 0;
     }
 
     /// Specify the command-line arguments of the job.
     pub fn set_argv<I: IntoIterator<Item = S>, S: AsRef<str>>(&mut self, argv: I) -> &mut Self {
         self.maybe_clear_argv();
-        let buf: Vec<_> = argv.into_iter().collect();
-
+        let (ptr, size) = slurm_alloc_utf8_string_array(argv);
         {
             let d = self.sys_data_mut();
-            d.argc = buf.len() as u32;
-            d.argv = slurm_alloc_array(buf.len());
-
-            let args = unsafe { std::slice::from_raw_parts_mut(d.argv, buf.len()) };
-            for (i, s) in buf.iter().enumerate() {
-                args[i] = slurm_alloc_utf8_string(s.as_ref()) as _;
-            }
+            d.argv = ptr;
+            d.argc = size as u32;
         }
-
         self
+    }
+
+    fn maybe_clear_environment(&mut self) {
+        let d = self.sys_data_mut();
+        slurm_free_string_array(&mut d.environment, d.env_size as usize);
+        d.env_size = 0;
+    }
+
+    /// Explicitly specify the UNIX environment of the job.
+    pub fn set_environment<I: IntoIterator<Item = S>, S: AsRef<str>>(&mut self, env: I) -> &mut Self {
+        self.maybe_clear_environment();
+        let (ptr, size) = slurm_alloc_utf8_string_array(env);
+        {
+            let d = self.sys_data_mut();
+            d.environment = ptr;
+            d.env_size = size as u32;
+        }
+        self
+    }
+
+    /// Set the UNIX environment of the job to match that of the current process.
+    ///
+    /// This will panic if any environment variables are not decodable as
+    /// Unicode. This limitation could be worked around with some developer
+    /// effort.
+    pub fn inherit_environment(&mut self) -> &mut Self {
+        self.set_environment(std::env::vars().map(|(key, val)| format!("{}={}", key, val)))
     }
 }
 
 impl Drop for JobDescriptorOwned {
     fn drop(&mut self) {
         self.maybe_clear_argv();
+        self.maybe_clear_environment();
         slurm_free(&mut (self.0).0);
     }
 }
