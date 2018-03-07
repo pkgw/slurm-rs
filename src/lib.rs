@@ -126,7 +126,7 @@ macro_rules! pstry {
     ($op:expr) => {{
         let ptr = unsafe { $op };
 
-        if ptr == 0 as _ {
+        if ptr.is_null() {
             let e = unsafe { slurm_sys::slurm_get_errno() };
             Err(SlurmError::from_slurm(e))
         } else {
@@ -136,12 +136,14 @@ macro_rules! pstry {
 }
 
 
-/// Allocate a structure using Slurm's allocator.
-fn slurm_alloc<T>() -> *mut T {
+/// Allocate memory using Slurm's allocator.
+fn slurm_alloc_array<T>(count: usize) -> *mut T {
     const TEXT: &[u8] = b"slurm-rs\0";
-    let ptr = unsafe { slurm_sys::slurm_try_xmalloc(std::mem::size_of::<T>(), TEXT.as_ptr() as _, 1, TEXT.as_ptr() as _) };
+    let ptr = unsafe {
+        slurm_sys::slurm_try_xmalloc(std::mem::size_of::<T>() * count, TEXT.as_ptr() as _, 1, TEXT.as_ptr() as _)
+    };
 
-    if ptr == 0 as _ {
+    if ptr.is_null() {
         panic!("Slurm memory allocation failed");
     }
 
@@ -149,7 +151,28 @@ fn slurm_alloc<T>() -> *mut T {
 }
 
 
+/// Allocate a structure using Slurm's allocator.
+fn slurm_alloc<T>() -> *mut T {
+    slurm_alloc_array(1)
+}
+
+
+/// Allocate a C-style string using Slurm's allocator, encoding it as UTF-8.
+fn slurm_alloc_utf8_string<S: AsRef<str>>(s: S) -> *mut u8 {
+    let bytes = s.as_ref().as_bytes();
+    let n = bytes.len() + 1;
+    let ptr = slurm_alloc_array(n);
+    let dest = unsafe { std::slice::from_raw_parts_mut(ptr, n) };
+    dest[..n].copy_from_slice(bytes);
+    dest[n] = b'\0';
+    ptr
+}
+
+
 /// Free a structure using Slurm's allocator.
+///
+/// A mutable reference to the pointer is required; after freeing, the pointer
+/// is nullified. This call is a no-op if the input pointer is already null.
 fn slurm_free<T>(thing: &mut *mut T) {
     const TEXT: &[u8] = b"slurm-rs\0";
     let p = &mut (*thing as *mut c_void);
@@ -308,7 +331,7 @@ impl<T: UnownedFromSlurmPointer> SlurmList<T> {
     pub fn iter<'a>(&'a self) -> SlurmListIteratorOwned<'a, T> {
         let ptr = unsafe { slurm_sys::slurm_list_iterator_create(self.0) };
 
-        if ptr == 0 as _ {
+        if ptr.is_null() {
             panic!("failed to create list iterator");
         }
 
@@ -371,7 +394,7 @@ impl<'a, T: 'a + UnownedFromSlurmPointer> Iterator for SlurmListIteratorOwned<'a
     fn next(&mut self) -> Option<T> {
         let ptr = unsafe { slurm_sys::slurm_list_next(self.0) };
 
-        if ptr == 0 as _ {
+        if ptr.is_null() {
             None
         } else {
             Some(T::unowned_from_slurm_pointer(ptr))
@@ -538,7 +561,7 @@ impl SlurmList<JobStepFilter> {
     pub fn append(&mut self, item: JobStepFilterOwned) {
         let item = unsafe { item.give_up_ownership() };
 
-        if self.0 == 0 as _ {
+        if self.0.is_null() {
             // XXX if malloc fails, I think this function will abort under us.
             self.0 = unsafe { slurm_sys::slurm_list_create(Some(slurm_sys::slurmdb_destroy_selected_step)) };
         }
@@ -627,13 +650,46 @@ impl JobDescriptorOwned {
         unsafe { slurm_sys::slurm_init_job_desc_msg((inst.0).0); }
         inst
     }
+
+    fn maybe_clear_argv(&mut self) {
+        let d = self.sys_data_mut();
+
+        if d.argv.is_null() {
+            return;
+        }
+
+        let args = unsafe { std::slice::from_raw_parts_mut(d.argv, d.argc as usize) };
+        for mut ptr in args {
+            slurm_free(&mut ptr);
+        }
+
+        slurm_free(&mut d.argv);
+        d.argc = 0;
+    }
+
+    /// Specify the command-line arguments of the job.
+    pub fn set_argv<I: IntoIterator<Item = S>, S: AsRef<str>>(&mut self, argv: I) -> &mut Self {
+        self.maybe_clear_argv();
+        let buf: Vec<_> = argv.into_iter().collect();
+
+        {
+            let d = self.sys_data_mut();
+            d.argc = buf.len() as u32;
+            d.argv = slurm_alloc_array(buf.len());
+
+            let args = unsafe { std::slice::from_raw_parts_mut(d.argv, buf.len()) };
+            for (i, s) in buf.iter().enumerate() {
+                args[i] = slurm_alloc_utf8_string(s.as_ref()) as _;
+            }
+        }
+
+        self
+    }
 }
 
 impl Drop for JobDescriptorOwned {
     fn drop(&mut self) {
-        // TODO: `slurm_init_job_desc_msg` doesn't allocate any
-        // sub-structures, but we will probably end up wanting to set various
-        // strings that will end up needing deallocation here.
+        self.maybe_clear_argv();
         slurm_free(&mut (self.0).0);
     }
 }
