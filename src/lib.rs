@@ -160,14 +160,14 @@ fn slurm_alloc<T>() -> *mut T {
 
 
 /// Allocate a C-style string using Slurm's allocator, encoding it as UTF-8.
-fn slurm_alloc_utf8_string<S: AsRef<str>>(s: S) -> *mut u8 {
+fn slurm_alloc_utf8_string<S: AsRef<str>>(s: S) -> *mut c_char {
     let bytes = s.as_ref().as_bytes();
     let n = bytes.len() + 1;
     let ptr = slurm_alloc_array(n);
     let dest = unsafe { std::slice::from_raw_parts_mut(ptr, n) };
     dest[..n].copy_from_slice(bytes);
     dest[n] = b'\0';
-    ptr
+    ptr as _
 }
 
 
@@ -1021,6 +1021,26 @@ pub struct job_descriptor {
 ");
 
 impl JobDescriptor {
+    /// Get this job's name.
+    pub fn name(&self) -> Cow<str> {
+         unsafe { CStr::from_ptr(self.sys_data().name) }.to_string_lossy()
+    }
+
+    /// Get this job's assigned partition.
+    pub fn partition(&self) -> Cow<str> {
+         unsafe { CStr::from_ptr(self.sys_data().partition) }.to_string_lossy()
+    }
+
+    /// Get the contents of this job's batch wrapper script.
+    pub fn script(&self) -> Cow<str> {
+         unsafe { CStr::from_ptr(self.sys_data().script) }.to_string_lossy()
+    }
+
+    /// Get the contents of this job's assigned working directory.
+    pub fn work_dir(&self) -> Cow<str> {
+         unsafe { CStr::from_ptr(self.sys_data().work_dir) }.to_string_lossy()
+    }
+
     /// Submit this job to the batch processor.
     ///
     /// TODO? Handle server-side errors reported in the response.
@@ -1085,12 +1105,79 @@ impl JobDescriptorOwned {
     pub fn inherit_environment(&mut self) -> &mut Self {
         self.set_environment(std::env::vars().map(|(key, val)| format!("{}={}", key, val)))
     }
+
+    /// Set this job's name.
+    pub fn set_name<S: AsRef<str>>(&mut self, name: S) -> &mut Self {
+        {
+            let d = self.sys_data_mut();
+            slurm_free(&mut d.name);
+            d.name = slurm_alloc_utf8_string(name);
+        }
+        self
+    }
+
+    /// Set this job's partition.
+    pub fn set_partition<S: AsRef<str>>(&mut self, partition: S) -> &mut Self {
+        {
+            let d = self.sys_data_mut();
+            slurm_free(&mut d.partition);
+            d.partition = slurm_alloc_utf8_string(partition);
+        }
+        self
+    }
+
+    /// Set the contents of this job's wrapper shell script.
+    ///
+    /// This is the textual content of a shell script that will be executed as
+    /// the batch job wrapper. It should start with a shebang (`#!`) line.
+    pub fn set_script<S: AsRef<str>>(&mut self, script: S) -> &mut Self {
+        {
+            let d = self.sys_data_mut();
+            slurm_free(&mut d.script);
+            d.script = slurm_alloc_utf8_string(script);
+        }
+        self
+    }
+
+    /// Set this job's working directory.
+    ///
+    /// The working directory should be one that exists on all worker nodes of
+    /// the cluster.
+    pub fn set_work_dir<S: AsRef<str>>(&mut self, work_dir: S) -> &mut Self {
+        {
+            let d = self.sys_data_mut();
+            slurm_free(&mut d.work_dir);
+            d.work_dir = slurm_alloc_utf8_string(work_dir);
+        }
+        self
+    }
+
+    /// Set this job's working directory to the current process's current
+    /// directory.
+    ///
+    /// See `std::env::current_dir` for an explanation of the cases in which
+    /// this operation can fail.
+    pub fn set_work_dir_cwd(&mut self) -> Result<&mut Self, Error> {
+        Ok(self.set_work_dir(std::env::current_dir()?
+                          .to_str()
+                          .ok_or(format_err!("could not express CWD as UTF8"))?
+        ))
+    }
 }
 
 impl Drop for JobDescriptorOwned {
     fn drop(&mut self) {
         self.maybe_clear_argv();
         self.maybe_clear_environment();
+
+        {
+            let d = self.sys_data_mut();
+            slurm_free(&mut d.name);
+            slurm_free(&mut d.partition);
+            slurm_free(&mut d.script);
+            slurm_free(&mut d.work_dir);
+        }
+
         slurm_free(&mut (self.0).0);
     }
 }
