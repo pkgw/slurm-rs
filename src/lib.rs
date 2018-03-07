@@ -981,6 +981,17 @@ pub struct job_descriptor {
 
 ");
 
+impl JobDescriptor {
+    /// Submit this job to the batch processor.
+    ///
+    /// TODO? Handle server-side errors reported in the response.
+    pub fn submit_batch(&self) -> Result<SubmitResponseMessageOwned, SlurmError> {
+        let mut msg = std::ptr::null_mut();
+        ustry!(slurm_sys::slurm_submit_batch_job(self.0, &mut msg as _));
+        Ok(unsafe { SubmitResponseMessageOwned::assume_ownership(msg as _) })
+    }
+}
+
 make_owned_version!(@customdrop JobDescriptor, JobDescriptorOwned, "An owned version of `JobDescriptor`.");
 
 impl JobDescriptorOwned {
@@ -1042,14 +1053,16 @@ Information returned by Slurm upon job submission.
 impl SubmitResponseMessage {
     /// Get the job ID of the new job.
     ///
-    /// TODO: option depending on error code?
+    /// XXX: It looks like it is possible to have a non-zero `error_code` with
+    /// a non-zero job ID; I'm not sure in what cases that occurs.
     pub fn job_id(&self) -> JobId {
         self.sys_data().job_id
     }
 
     /// Get the job-step ID of the new job.
     ///
-    /// TODO: option depending on error code?
+    /// XXX: It looks like it is possible to have a non-zero `error_code` with
+    /// a non-zero job ID; I'm not sure in what cases that occurs.
     pub fn step_id(&self) -> StepId {
         self.sys_data().step_id
     }
