@@ -877,8 +877,16 @@ impl JobRecord {
         Utc.timestamp(self.sys_data().submit as i64, 0)
     }
 
+    /// Get the wallclock time spent waiting for the job to become eligible,
+    /// or None if the job has not yet become eligible to run.
+    pub fn eligible_wait_duration(&self) -> Option<Duration> {
+        self.eligible_time().map(|t| t.signed_duration_since(self.submit_time()))
+    }
+
     /// Get the wallclock time spent waiting for the job to start, or None
     /// if the job has not yet started.
+    ///
+    /// This includes time that the job spent waiting to become eligible to run.
     pub fn wait_duration(&self) -> Option<Duration> {
         self.start_time().map(|t| t.signed_duration_since(self.submit_time()))
     }

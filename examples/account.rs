@@ -51,6 +51,12 @@ fn inner(jobid: &str) -> Result<i32, Error> {
         println!("{} {}", job.job_id(), job.job_name());
 
         if let Some(d) = job.wait_duration() {
+            println!("  time for job to become eligible to run: {} s", d.num_seconds());
+        } else {
+            println!("  job not yet eligible to run");
+        }
+
+        if let Some(d) = job.wait_duration() {
             println!("  wait time: {} s", d.num_seconds());
         } else {
             println!("  still waiting to start");
