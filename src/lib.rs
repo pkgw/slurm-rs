@@ -946,7 +946,6 @@ pub struct job_descriptor {
     pub mcs_label: *mut c_char,
     pub mem_bind: *mut c_char,
     pub mem_bind_type: u16,
-    pub name: *mut c_char,
     pub network: *mut c_char,
     pub nice: u32,
     pub num_tasks: u32,
@@ -955,7 +954,6 @@ pub struct job_descriptor {
     pub other_port: u16,
     pub overcommit: u8,
     pub pack_job_offset: u32,
-    pub partition: *mut c_char,
     pub plane_size: u16,
     pub power_flags: u8,
     pub priority: u32,
@@ -967,7 +965,6 @@ pub struct job_descriptor {
     pub req_nodes: *mut c_char,
     pub requeue: u16,
     pub reservation: *mut c_char,
-    pub script: *mut c_char,
     pub shared: u16,
     pub spank_job_env: *mut *mut c_char,
     pub spank_job_env_size: u32,
@@ -979,7 +976,6 @@ pub struct job_descriptor {
     pub warn_flags: u16,
     pub warn_signal: u16,
     pub warn_time: u16,
-    pub work_dir: *mut c_char,
     pub cpus_per_task: u16,
     pub min_cpus: u32,
     pub max_cpus: u32,
@@ -1006,9 +1002,6 @@ pub struct job_descriptor {
     pub ramdiskimage: *mut c_char,
     pub req_switch: u32,
     pub select_jobinfo: *mut dynamic_plugin_data_t,
-    pub std_err: *mut c_char,
-    pub std_in: *mut c_char,
-    pub std_out: *mut c_char,
     pub tres_req_cnt: *mut u64,
     pub wait4switch: u32,
     pub wckey: *mut c_char,
@@ -1034,6 +1027,21 @@ impl JobDescriptor {
     /// Get the contents of this job's batch wrapper script.
     pub fn script(&self) -> Cow<str> {
          unsafe { CStr::from_ptr(self.sys_data().script) }.to_string_lossy()
+    }
+
+    /// Get the path for this job's standard error stream.
+    pub fn stderr_path(&self) -> Cow<str> {
+         unsafe { CStr::from_ptr(self.sys_data().std_err) }.to_string_lossy()
+    }
+
+    /// Get the path for this job's standard input stream.
+    pub fn stdin_path(&self) -> Cow<str> {
+         unsafe { CStr::from_ptr(self.sys_data().std_in) }.to_string_lossy()
+    }
+
+    /// Get the path for this job's standard output stream.
+    pub fn stdout_path(&self) -> Cow<str> {
+         unsafe { CStr::from_ptr(self.sys_data().std_out) }.to_string_lossy()
     }
 
     /// Get the contents of this job's assigned working directory.
@@ -1139,6 +1147,36 @@ impl JobDescriptorOwned {
         self
     }
 
+    /// Set the path that will be used as this job's standard error stream.
+    pub fn set_stderr_path<S: AsRef<str>>(&mut self, path: S) -> &mut Self {
+        {
+            let d = self.sys_data_mut();
+            slurm_free(&mut d.std_err);
+            d.std_err = slurm_alloc_utf8_string(path);
+        }
+        self
+    }
+
+    /// Set the path that will be used as this job's standard input stream.
+    pub fn set_stdin_path<S: AsRef<str>>(&mut self, path: S) -> &mut Self {
+        {
+            let d = self.sys_data_mut();
+            slurm_free(&mut d.std_in);
+            d.std_in = slurm_alloc_utf8_string(path);
+        }
+        self
+    }
+
+    /// Set the path that will be used as this job's standard output stream.
+    pub fn set_stdout_path<S: AsRef<str>>(&mut self, path: S) -> &mut Self {
+        {
+            let d = self.sys_data_mut();
+            slurm_free(&mut d.std_out);
+            d.std_out = slurm_alloc_utf8_string(path);
+        }
+        self
+    }
+
     /// Set this job's working directory.
     ///
     /// The working directory should be one that exists on all worker nodes of
@@ -1175,6 +1213,9 @@ impl Drop for JobDescriptorOwned {
             slurm_free(&mut d.name);
             slurm_free(&mut d.partition);
             slurm_free(&mut d.script);
+            slurm_free(&mut d.std_err);
+            slurm_free(&mut d.std_in);
+            slurm_free(&mut d.std_out);
             slurm_free(&mut d.work_dir);
         }
 
