@@ -17,6 +17,7 @@ or allocating memory associated with their sub-structures.
 extern crate chrono;
 #[macro_use] extern crate failure;
 #[macro_use] extern crate failure_derive;
+extern crate libc;
 extern crate slurm_sys;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
@@ -1053,6 +1054,22 @@ impl JobDescriptor {
     /// Get the path for this job's standard output stream.
     pub fn stdout_path(&self) -> Cow<str> {
          unsafe { CStr::from_ptr(self.sys_data().std_out) }.to_string_lossy()
+    }
+
+    /// Get the user ID associated with this job.
+    pub fn uid(&self) -> u32 {
+        self.sys_data().user_id
+    }
+
+    /// Set the user ID associated with this job.
+    pub fn set_uid(&mut self, value: u32) -> &mut Self {
+        self.sys_data_mut().user_id = value;
+        self
+    }
+
+    /// Set the user ID associated with this job to that of the current process.
+    pub fn set_uid_current(&mut self) -> &mut Self {
+        self.set_uid(unsafe { libc::getuid() })
     }
 
     /// Get the contents of this job's assigned working directory.

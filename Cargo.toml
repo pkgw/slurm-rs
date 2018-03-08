@@ -14,5 +14,6 @@ chrono = "0.4"
 clap = "2.30"
 failure = "0.1"
 failure_derive = "0.1"
+libc = "0.2"
 slurm-sys = { path = "slurm-sys" }
 
