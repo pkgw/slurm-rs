@@ -1019,6 +1019,17 @@ impl JobDescriptor {
          unsafe { CStr::from_ptr(self.sys_data().name) }.to_string_lossy()
     }
 
+    /// Get the number of tasks within this job.
+    pub fn num_tasks(&self) -> u32 {
+        self.sys_data().num_tasks
+    }
+
+    /// Set the number of tasks within this job.
+    pub fn set_num_tasks(&mut self, value: u32) -> &mut Self {
+        self.sys_data_mut().num_tasks = value;
+        self
+    }
+
     /// Get this job's assigned partition.
     pub fn partition(&self) -> Cow<str> {
          unsafe { CStr::from_ptr(self.sys_data().partition) }.to_string_lossy()
