@@ -936,7 +936,6 @@ pub struct job_descriptor {
     pub fed_siblings_active: u64,
     pub fed_siblings_viable: u64,
     pub gres: *mut c_char,
-    pub group_id: u32,
     pub immediate: u16,
     pub job_id: u32,
     pub job_id_str: *mut c_char,
@@ -1013,6 +1012,22 @@ pub struct job_descriptor {
 ");
 
 impl JobDescriptor {
+    /// Get the group ID associated with this job.
+    pub fn gid(&self) -> u32 {
+        self.sys_data().group_id
+    }
+
+    /// Set the group ID associated with this job.
+    pub fn set_gid(&mut self, value: u32) -> &mut Self {
+        self.sys_data_mut().group_id = value;
+        self
+    }
+
+    /// Set the group ID associated with this job to that of the current process.
+    pub fn set_gid_current(&mut self) -> &mut Self {
+        self.set_gid(unsafe { libc::getgid() })
+    }
+
     /// Get this job's name.
     pub fn name(&self) -> Cow<str> {
          unsafe { CStr::from_ptr(self.sys_data().name) }.to_string_lossy()

@@ -53,9 +53,10 @@ fn inner() -> Result<i32, Error> {
         .set_work_dir_cwd()?
         .set_script("#! /bin/bash
 set -e -x
-echo hello world
+echo hello world \"$@\"
 ")
-        .set_num_tasks(1) // JobDescriptor args must come after due to the return type
+        .set_gid_current() // JobDescriptor args must come after due to the return type
+        .set_num_tasks(1)
         .set_time_limit(5)
         .set_uid_current();
 
