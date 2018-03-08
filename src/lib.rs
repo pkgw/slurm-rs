@@ -165,8 +165,8 @@ fn slurm_alloc_utf8_string<S: AsRef<str>>(s: S) -> *mut c_char {
     let n = bytes.len() + 1;
     let ptr = slurm_alloc_array(n);
     let dest = unsafe { std::slice::from_raw_parts_mut(ptr, n) };
-    dest[..n].copy_from_slice(bytes);
-    dest[n] = b'\0';
+    dest[..n-1].copy_from_slice(bytes);
+    dest[n-1] = b'\0';
     ptr as _
 }
 
