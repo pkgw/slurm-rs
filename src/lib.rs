@@ -970,9 +970,7 @@ pub struct job_descriptor {
     pub spank_job_env: *mut *mut c_char,
     pub spank_job_env_size: u32,
     pub task_dist: u32,
-    pub time_limit: u32,
     pub time_min: u32,
-    pub user_id: u32,
     pub wait_all_nodes: u16,
     pub warn_flags: u16,
     pub warn_signal: u16,
@@ -1054,6 +1052,19 @@ impl JobDescriptor {
     /// Get the path for this job's standard output stream.
     pub fn stdout_path(&self) -> Cow<str> {
          unsafe { CStr::from_ptr(self.sys_data().std_out) }.to_string_lossy()
+    }
+
+    /// Get the time limit associated with this job, measured in minutes.
+    pub fn time_limit(&self) -> u32 {
+        self.sys_data().time_limit
+    }
+
+    /// Set the time limit associated with this job.
+    ///
+    /// The value is measured in minutes.
+    pub fn set_time_limit(&mut self, minutes: u32) -> &mut Self {
+        self.sys_data_mut().time_limit = minutes;
+        self
     }
 
     /// Get the user ID associated with this job.

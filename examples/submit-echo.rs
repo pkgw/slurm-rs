@@ -56,6 +56,7 @@ set -e -x
 echo hello world
 ")
         .set_num_tasks(1) // JobDescriptor args must come after due to the return type
+        .set_time_limit(5)
         .set_uid_current();
 
     let msg = desc.submit_batch()?;
