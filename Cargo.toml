@@ -5,6 +5,13 @@
 name = "slurm"
 version = "0.1.0"
 authors = ["Peter Williams <peter@newton.cx>"]
+description = "Interface to the Slurm workload manager."
+homepage = "https://github.com/pkgw/slurm-rs"
+documentation = "https://docs.rs/slurm"
+repository = "https://github.com/pkgw/slurm-rs"
+readme = "README.md"
+keywords = ["slurm"]
+categories = ["concurrency", "science"]
 license = "MIT"
 
 [workspace]
@@ -15,5 +22,7 @@ clap = "2.30"
 failure = "0.1"
 failure_derive = "0.1"
 libc = "0.2"
-slurm-sys = { path = "slurm-sys" }
+slurm-sys = { path = "slurm-sys", version = "0.1.0" }
 
+[package.metadata.docs.rs]
+dependencies = ["libslurm-dev", "libslurmdb-dev"]
