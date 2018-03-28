@@ -1,7 +1,104 @@
 // Copyright 2017-2018 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT License
 
-/*! Interface to the Slurm workload manager.
+/*! Interface to the [Slurm](https://slurm.schedmd.com/) workload manager.
+
+Slurm is a system for scheduling and running jobs on large computing clusters.
+It is often used in scientific HPC (high-performance computing) contexts.
+
+This crate provides hooks for submitting new jobs and interrogating their
+status. Support for other kinds of operations, such as canceling jobs or
+altering their runtime parameters, would be entirely appropriate but has not
+yet been implemented.
+
+# Example: querying a running job
+
+```no_run
+extern crate failure;
+extern crate slurm;
+
+fn print_random_job_information(jobid: slurm::JobId) -> Result<(), failure::Error> {
+    let info = slurm::get_job_info(jobid)?;
+    println!("Job ID: {}", info.job_id()); // same as what we put in
+    println!("Job's partition: {}", info.partition());
+    Ok(())
+}
+```
+
+# Example: querying a completed job
+
+To gather information about jobs that have completed, you must connect to the
+Slurm accounting database and query it.
+
+```no_run
+extern crate chrono;
+extern crate failure;
+extern crate slurm;
+
+fn print_other_job_information(jobid: slurm::JobId) -> Result<(), failure::Error> {
+    let mut filter = slurm::JobFiltersOwned::default();
+    filter.step_list_mut().append(slurm::JobStepFilterOwned::new(jobid));
+
+    let db = slurm::DatabaseConnectionOwned::new()?;
+    let jobs = db.get_jobs(&filter)?;
+    let now = chrono::Utc::now();
+
+    for job in jobs.iter() {
+        println!("Job ID {}, name {}", job.job_id(), job.job_name());
+
+        if let Some(d) = job.wait_duration() {
+            println!("  job started; wait time: {} s", d.num_seconds());
+        } else if let Some(t_el) = job.eligible_time() {
+            let wait = now.signed_duration_since(t_el).num_seconds();
+            println!("  job not yet started; time since eligibility: {} s", wait);
+        } else {
+            println!("  job not yet eligible to run");
+        }
+    }
+
+    Ok(())
+}
+```
+
+# Submitting a “Hello World” job
+
+```no_run
+extern crate failure;
+extern crate slurm;
+
+fn submit_hello_world() -> Result<slurm::JobId, failure::Error> {
+    let cwd = std::env::current_dir()?;
+
+    let log = {
+        let mut p = cwd.clone();
+        p.push("%j.log");
+        p.to_str().ok_or(failure::err_msg("cannot stringify log path"))?.to_owned()
+    };
+
+    let mut desc = slurm::JobDescriptorOwned::new();
+
+    desc.set_name("helloworld")
+        .set_argv(&["helloworld"])
+        .inherit_environment()
+        .set_stderr_path(&log)
+        .set_stdin_path("/dev/null")
+        .set_stdout_path(&log)
+        .set_work_dir_cwd()?
+        .set_script("#! /bin/bash \
+                     set -e -x \
+                     echo hello world \"$@\"")
+        .set_gid_current() // JobDescriptor args must come after due to the return type
+        .set_num_tasks(1)
+        .set_time_limit(5)
+        .set_uid_current();
+
+    let msg = desc.submit_batch()?;
+    println!("new job id: {}", msg.job_id());
+    Ok(msg.job_id())
+}
+```
+
+# A note on memory management
 
 The Slurm C library uses a (primitive) custom memory allocator for its data
 structures. Because we must maintain compatibility with this allocator, we
@@ -450,7 +547,7 @@ Information about a running job.
 
 The following items in the Slurm API are *not* exposed in these Rust bindings:
 
-```
+```ignore
 pub struct job_info {
     pub account: *mut c_char,
     pub admin_comment: *mut c_char,
@@ -670,7 +767,7 @@ accounting database.
 
 The following items in the Slurm API are *not* exposed in these Rust bindings:
 
-```
+```ignore
 pub struct slurmdb_job_cond_t {
     pub acct_list: List,
     pub associd_list: List,
@@ -772,7 +869,7 @@ Accounting information about a job.
 
 The following items in the Slurm API are *not* exposed in these Rust bindings:
 
-```
+```ignore
 pub struct slurmdb_job_rec_t {
     pub account: *mut c_char,
     pub admin_comment: *mut c_char,
@@ -848,7 +945,7 @@ pub trait JobStepRecordSharedFields {
 ///
 /// The complete list of overlapping fields is:
 ///
-/// ```
+/// ```ignore
 /// {
 ///    elapsed: u32,
 ///    end: i64,
@@ -961,7 +1058,7 @@ Accounting information about a step within a job.
 
 The following items in the Slurm API are *not* exposed in these Rust bindings:
 
-```
+```ignore
 pub struct slurmdb_step_rec_t {
     pub job_ptr: *mut slurmdb_job_rec_t,
     pub nnodes: u32,
@@ -998,7 +1095,7 @@ A description of a batch job to submit.
 
 The following items in the Slurm API are *not* exposed in these Rust bindings:
 
-```
+```ignore
 pub struct job_descriptor {
     pub account: *mut c_char,
     pub acctg_freq: *mut c_char,
