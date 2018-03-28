@@ -7,12 +7,7 @@ version = "0.1.0"
 authors = ["Peter Williams <peter@newton.cx>"]
 links = "slurm"
 build = "build.rs"
-description = """ 
-Low-level bindings to the `libslurm` and `libslurmdb` libraries. These
-libraries provide access to [Slurm](https://slurm.schedmd.com/), a workload
-manager system for scheduling and running jobs on large computing clusters. It
-is often used in scientific HPC (high-performance computing) contexts.
-"""
+description = "Low-level FFI bindings to the libslurm and libslurmdb libraries."
 homepage = "https://github.com/pkgw/slurm-rs"
 documentation = "https://docs.rs/slurm-sys"
 repository = "https://github.com/pkgw/slurm-rs"
