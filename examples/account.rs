@@ -12,6 +12,7 @@ extern crate slurm;
 use chrono::Utc;
 use clap::{Arg, App};
 use failure::Error;
+use slurm::JobStepRecordSharedFields;
 use std::process;
 
 fn main() {
@@ -69,14 +70,24 @@ fn inner(jobid: &str) -> Result<i32, Error> {
             println!("  still waiting to start");
         }
 
-        if let Some(d) = job.wallclock_duration() {
-            println!("  wallclock runtime: {} s", d.num_seconds());
-            println!("  exit code: {}", job.exit_code().unwrap());
-        } else if let Some(t_st) = job.start_time() {
-            let wait = now.signed_duration_since(t_st);
-            println!("  job not yet finished; time since start: {} s", wait.num_seconds());
-        } else {
-            println!("  job not yet finished");
+        for step in job.steps().iter() {
+            println!("  step {} {}", step.step_id(), step.step_name());
+
+            if let Some(d) = job.wallclock_duration() {
+                println!("    wallclock runtime: {} s", d.num_seconds());
+                println!("    exit code: {}", job.exit_code().unwrap());
+            } else if let Some(t_st) = job.start_time() {
+                let wait = now.signed_duration_since(t_st);
+                println!("    step not yet finished; time since start: {} s", wait.num_seconds());
+            } else {
+                println!("    step not yet finished");
+            }
+
+            if let Some(b) = step.max_vm_size() {
+                println!("    max VM size: {:.2} MiB", (b as f64) / 1024.);
+            } else {
+                println!("    max VM size not available (probably because step not finished)");
+            }
         }
     }
 

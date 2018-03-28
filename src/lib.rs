@@ -787,12 +787,10 @@ pub struct slurmdb_job_rec_t {
     pub cluster: *mut c_char,
     pub derived_ec: u32,
     pub derived_es: *mut c_char,
-    pub elapsed: u32,
     pub first_step_ptr: *mut c_void,
     pub gid: u32,
     pub lft: u32,
     pub mcs_label: *mut c_char,
-    pub nodes: *mut c_char,
     pub partition: *mut c_char,
     pub pack_job_id: u32,
     pub pack_job_offset: u32,
@@ -801,33 +799,117 @@ pub struct slurmdb_job_rec_t {
     pub req_cpus: u32,
     pub req_gres: *mut c_char,
     pub req_mem: u64,
-    pub requid: u32,
     pub resvid: u32,
     pub resv_name: *mut c_char,
     pub show_full: u32,
-    pub state: u32,
-    pub stats: slurmdb_stats_t,
     pub steps: List,
-    pub suspended: u32,
-    pub sys_cpu_sec: u32,
-    pub sys_cpu_usec: u32,
     pub timelimit: u32,
-    pub tot_cpu_sec: u32,
-    pub tot_cpu_usec: u32,
     pub track_steps: u16,
-    pub tres_alloc_str: *mut c_char,
     pub tres_req_str: *mut c_char,
     pub uid: u32,
     pub used_gres: *mut c_char,
     pub user: *mut c_char,
-    pub user_cpu_sec: u32,
-    pub user_cpu_usec: u32,
     pub wckey: *mut c_char,
     pub wckeyid: u32,
     pub work_dir: *mut c_char,
 }
 ```
+
+(The above listing omits fields that would be handled by the
+`JobStepRecordSharedFields` trait.)
 ");
+
+/// A trait for accessing fields common to SlurmDB job records and step
+/// records.
+pub trait JobStepRecordSharedFields {
+    /// Get the job/step's end time, or None if it has not yet ended.
+    fn end_time(&self) -> Option<DateTime<Utc>>;
+
+    /// Get the job/step's exit code, or None if it has not yet ended.
+    fn exit_code(&self) -> Option<i32>;
+
+    /// Get the maximum "virtual memory size" of the job/step, in kibibytes.
+    ///
+    /// This quantity is not available (i.e., the function returns `None`)
+    /// until the job has finished running.
+    fn max_vm_size(&self) -> Option<u64>;
+
+    /// Get the job/step's start time, or None if it has not yet started.
+    fn start_time(&self) -> Option<DateTime<Utc>>;
+
+    /// Get the wallclock time taken by the job/step: end time minus start time.
+    ///
+    /// Returns None if the job/step has not yet completed (or even started).
+    fn wallclock_duration(&self) -> Option<Duration>;
+}
+
+/// We implement the JobStepRecordSharedFields trait with a macro; that seems
+/// like the easiest thing to do.
+///
+/// The complete list of overlapping fields is:
+///
+/// ```
+/// {
+///    elapsed: u32,
+///    end: i64,
+///    exitcode: i32,
+///    nodes: *mut c_char,
+///    requid: u32,
+///    start: i64,
+///    state: u32,
+///    stats: &slurm_sys::slurmdb_stats_t,
+///    suspended: u32,
+///    sys_cpu_sec: u32,
+///    sys_cpu_usec: u32,
+///    tot_cpu_sec: u32,
+///    tot_cpu_usec: u32,
+///    tres_alloc_str: *mut c_char,
+///    user_cpu_sec: u32,
+///    user_cpu_usec: u32,
+/// }
+/// ```
+macro_rules! impl_job_step_record_shared_fields {
+    ($type:path) => {
+        impl JobStepRecordSharedFields for $type {
+            fn end_time(&self) -> Option<DateTime<Utc>> {
+                match self.sys_data().end as i64 {
+                    0 => None,
+                    t => Some(Utc.timestamp(t, 0)),
+                }
+            }
+
+            fn exit_code(&self) -> Option<i32> {
+                match self.sys_data().end as i64  {
+                    0 => None,
+                    _ => Some(self.sys_data().exitcode as i32),
+                }
+            }
+
+            fn max_vm_size(&self) -> Option<u64> {
+                match self.sys_data().stats.vsize_max {
+                    slurm_sys::SLURMRS_NO_VAL64 => None,
+                    other => Some(other),
+                }
+            }
+
+            fn start_time(&self) -> Option<DateTime<Utc>> {
+                match self.sys_data().start as i64 {
+                    0 => None,
+                    t => Some(Utc.timestamp(t, 0)),
+                }
+            }
+
+            fn wallclock_duration(&self) -> Option<Duration> {
+                match (self.start_time(), self.end_time()) {
+                    (Some(start), Some(end)) => Some(end.signed_duration_since(start)),
+                    _ => None,
+                }
+            }
+        }
+    }
+}
+
+impl_job_step_record_shared_fields!(JobRecord);
 
 impl JobRecord {
     /// Get the job's "eligible" time, or None if the job is not yet eligible to run.
@@ -835,22 +917,6 @@ impl JobRecord {
         match self.sys_data().eligible as i64 {
             0 => None,
             t => Some(Utc.timestamp(t, 0)),
-        }
-    }
-
-    /// Get the job's end time, or None if the job has not yet ended.
-    pub fn end_time(&self) -> Option<DateTime<Utc>> {
-        match self.sys_data().end as i64 {
-            0 => None,
-            t => Some(Utc.timestamp(t, 0)),
-        }
-    }
-
-    /// Get the job's exit code, or None if the job has not yet ended.
-    pub fn exit_code(&self) -> Option<u32> {
-        match self.sys_data().end as i64 {
-            0 => None,
-            _ => Some(self.sys_data().exitcode),
         }
     }
 
@@ -862,14 +928,6 @@ impl JobRecord {
     /// Get the job's name.
     pub fn job_name(&self) -> Cow<str> {
          unsafe { CStr::from_ptr(self.sys_data().jobname) }.to_string_lossy()
-    }
-
-    /// Get the job's start time, or None if the job has not yet started.
-    pub fn start_time(&self) -> Option<DateTime<Utc>> {
-        match self.sys_data().start as i64 {
-            0 => None,
-            t => Some(Utc.timestamp(t, 0)),
-        }
     }
 
     /// Get the job's submission time.
@@ -891,13 +949,46 @@ impl JobRecord {
         self.start_time().map(|t| t.signed_duration_since(self.submit_time()))
     }
 
-    /// Get the wallclock time taken by the job: end time minus start time.
-    /// Returns None if the job has not yet completed (or even started).
-    pub fn wallclock_duration(&self) -> Option<Duration> {
-        match (self.start_time(), self.end_time()) {
-            (Some(start), Some(end)) => Some(end.signed_duration_since(start)),
-            _ => None,
-        }
+    /// Steps.
+    pub fn steps(&self) -> &SlurmList<StepRecord> {
+        unsafe { SlurmList::transmute_ptr(&self.sys_data().steps) }
+    }
+}
+
+
+make_slurm_wrap_struct!(StepRecord, slurm_sys::slurmdb_step_rec_t, "\
+Accounting information about a step within a job.
+
+The following items in the Slurm API are *not* exposed in these Rust bindings:
+
+```
+pub struct slurmdb_step_rec_t {
+    pub job_ptr: *mut slurmdb_job_rec_t,
+    pub nnodes: u32,
+    pub ntasks: u32,
+    pub pid_str: *mut c_char,
+    pub req_cpufreq_min: u32,
+    pub req_cpufreq_max: u32,
+    pub req_cpufreq_gov: u32,
+    pub task_dist: u32,
+}
+```
+
+(The above listing omits fields that would be handled by the
+`JobStepRecordSharedFields` trait.)
+");
+
+impl_job_step_record_shared_fields!(StepRecord);
+
+impl StepRecord {
+    /// Get the step's ID.
+    pub fn step_id(&self) -> StepId {
+         self.sys_data().stepid
+    }
+
+    /// Get the step's name.
+    pub fn step_name(&self) -> Cow<str> {
+         unsafe { CStr::from_ptr(self.sys_data().stepname) }.to_string_lossy()
     }
 }
 

@@ -4,10 +4,15 @@
 #include <slurm/slurm.h>
 #include <slurm/slurmdb.h>
 
-/* Expose some #defines as enumeration values */
+/* Expose some #defines as enumeration values. Two enums needed because
+ * otherwise NO_VAL64 upgrades the other value(s) to 64-bit storage. */
 
 enum {
     SLURMRS_NO_VAL = NO_VAL,
+};
+
+enum {
+    SLURMRS_NO_VAL64 = NO_VAL64,
 };
 
 /* The official API doesn't expose the memory management functions,
