@@ -508,6 +508,30 @@ impl<T> Drop for SlurmListOwned<T> {
 }
 
 
+/// Customized support for lists of strings.
+impl SlurmList<*mut c_char> {
+    pub fn iter<'a>(&'a self) -> SlurmStringListIteratorOwned<'a> {
+        let ptr = unsafe { slurm_sys::slurm_list_iterator_create(self.0) };
+
+        if ptr.is_null() {
+            panic!("failed to create list iterator");
+        }
+
+        SlurmStringListIteratorOwned(ptr as _, PhantomData)
+    }
+
+    pub fn append<S: AsRef<str>>(&mut self, s: S) {
+        let ptr = slurm_alloc_utf8_string(s);
+
+        if self.0.is_null() {
+            self.0 = unsafe { slurm_sys::slurm_list_create(Some(slurm_sys::slurmrs_free)) };
+        }
+
+        unsafe { slurm_sys::slurm_list_append(self.0, ptr as _); }
+    }
+}
+
+
 // Likewise for iterating through lists, except the iterators are always owned
 #[derive(Debug)]
 pub struct SlurmListIteratorOwned<'a, T: 'a + UnownedFromSlurmPointer>(*mut slurm_sys::listIterator, PhantomData<&'a T>);
@@ -528,6 +552,31 @@ impl<'a, T: 'a + UnownedFromSlurmPointer> Iterator for SlurmListIteratorOwned<'a
             None
         } else {
             Some(T::unowned_from_slurm_pointer(ptr))
+        }
+    }
+}
+
+
+/// A helper for iterating through lists of strings.
+#[derive(Debug)]
+pub struct SlurmStringListIteratorOwned<'a>(*mut slurm_sys::listIterator, PhantomData<&'a str>);
+
+impl<'a> Drop for SlurmStringListIteratorOwned<'a> {
+    fn drop(&mut self) {
+        unsafe { slurm_sys::slurm_list_iterator_destroy(self.0) };
+    }
+}
+
+impl<'a> Iterator for SlurmStringListIteratorOwned<'a> {
+    type Item = Cow<'a, str>;
+
+    fn next(&mut self) -> Option<Cow<'a, str>> {
+        let ptr = unsafe { slurm_sys::slurm_list_next(self.0) };
+
+        if ptr.is_null() {
+            None
+        } else {
+            Some(unsafe { CStr::from_ptr(ptr as _) }.to_string_lossy())
         }
     }
 }
@@ -784,7 +833,6 @@ pub struct slurmdb_job_cond_t {
     pub usage_end: time_t,
     pub usage_start: time_t,
     pub used_nodes: *mut c_char,
-    pub userid_list: List,
     pub wckey_list: List,
     pub without_steps: u16,
     pub without_usage_truncation: u16,
@@ -800,6 +848,20 @@ impl JobFilters {
 
     pub fn step_list_mut(&mut self) -> &mut SlurmList<JobStepFilter> {
         unsafe { SlurmList::transmute_ptr_mut(&mut self.sys_data_mut().step_list) }
+    }
+
+    /// Access the list of user ID numbers that will match this set of filters.
+    ///
+    /// Note that this list should consist of *textual* representations of
+    /// *numeric* user IDs. Yes, it's silly.
+    pub fn userid_list(&self) -> &SlurmList<*mut c_char> {
+        unsafe { SlurmList::transmute_ptr(&self.sys_data().userid_list) }
+    }
+
+    /// Mutably access the list of user ID numbers that will match this set of
+    /// filters.
+    pub fn userid_list_mut(&mut self) -> &mut SlurmList<*mut c_char> {
+        unsafe { SlurmList::transmute_ptr_mut(&mut self.sys_data_mut().userid_list) }
     }
 }
 

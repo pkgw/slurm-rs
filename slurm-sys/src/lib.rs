@@ -18,3 +18,15 @@
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 include!(concat!(env!("OUT_DIR"), "/features.rs"));
+
+/// This function can be passed as a callback to functions like
+/// `slurm_list_create` that want a deallocator argument. `slurm_xfree`
+/// doesn't work because (1) it takes a pointer *to a* pointer, so that it can
+/// zero it out; and (2) it takes additional arguments populated from C
+/// preprocessor __FILE__/__LINE__ directives.
+#[no_mangle]
+pub extern fn slurmrs_free(ptr: *mut std::os::raw::c_void) {
+    let mut copy = ptr;
+    const TEXT: &[u8] = b"slurm-rs\0";
+    unsafe { slurm_xfree(&mut copy, TEXT.as_ptr() as _, 1, TEXT.as_ptr() as _) };
+}
