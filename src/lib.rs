@@ -836,7 +836,7 @@ impl JobStepFilterOwned {
             let sdm = inst.sys_data_mut();
             sdm.array_task_id = slurm_sys::SLURMRS_NO_VAL;
             sdm.jobid = jid;
-            #[cfg(feature = "slurm_api_selected_step_t_pack_job_offset")]
+            #[cfg(slurm_api_selected_step_t_pack_job_offset)]
             {
                 sdm.pack_job_offset = slurm_sys::SLURMRS_NO_VAL;
             }
@@ -1501,9 +1501,9 @@ impl SubmitResponseMessage {
     /// I think this is arbitrary text that should be shown to the user?
     ///
     /// This feature is not available in older versions of Slurm. (TBD: quantify).
-    #[cfg(feature = "slurm_sys_submit_response_user_message")]
+    #[cfg(slurm_api_submit_response_user_message)]
     pub fn user_message(&self) -> Cow<str> {
-         unsafe { CStr::from_ptr(self.sys_data().job_submit_user_msg) }.to_string_lossy()
+        unsafe { CStr::from_ptr(self.sys_data().job_submit_user_msg) }.to_string_lossy()
     }
 }
 
