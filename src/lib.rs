@@ -135,20 +135,8 @@ pub type JobId = u32;
 pub type StepId = u32;
 
 
-// (Ab)use macros a bit to map low-level slurm API errors to a Rust interface.
-
-macro_rules! each_mapped_slurm_error {
-    ($mac:ident) => {
-        $mac!(
-            <InvalidJobId, slurm_sys::ESLURM_INVALID_JOB_ID,
-             "The job ID did not correspond to a valid job.";>,
-            <InvalidPartitionName, slurm_sys::ESLURM_INVALID_PARTITION_NAME,
-             "The specified partition name was not recognized.";>
-        );
-    }
-}
-
-macro_rules! declare_slurm_error {
+/// A quick macro framework to map low-level slurm API errors to a Rust interface.
+macro_rules! declare_slurm_errors {
     ($(<$rustname:ident, $sysname:path, $doc:expr;>),*) => {
         /// Specifically-enumerated errors that we can get from the Slurm API.
         ///
@@ -186,7 +174,12 @@ macro_rules! declare_slurm_error {
     }
 }
 
-each_mapped_slurm_error!(declare_slurm_error);
+declare_slurm_errors!(
+    <InvalidJobId, slurm_sys::ESLURM_INVALID_JOB_ID,
+     "The job ID did not correspond to a valid job.";>,
+    <InvalidPartitionName, slurm_sys::ESLURM_INVALID_PARTITION_NAME,
+     "The specified partition name was not recognized.";>
+);
 
 impl Display for SlurmError {
     fn fmt(&self, f: &mut Formatter) -> Result<(), FmtError> {
