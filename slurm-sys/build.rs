@@ -10,15 +10,26 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    let slurm = pkg_config::Config::new().atleast_version("15.0").probe("slurm").unwrap();
-
-    println!("cargo:rustc-link-lib=dylib=slurmdb");
-
     let mut builder = bindgen::Builder::default()
         .header("src/wrapper.h");
 
-    for ref path in &slurm.include_paths {
-        builder = builder.clang_arg(format!("-I{}", path.display()));
+    // Some Slurm installs don't have a pkg-config file.
+    if let Ok(libdir) = env::var("SLURM_LIBDIR") {
+        println!("cargo:rustc-link-search=native={}", libdir);
+        println!("cargo:rustc-link-lib=dylib=slurm");
+        println!("cargo:rustc-link-lib=dylib=slurmdb");
+
+        if let Ok(incdir) = env::var("SLURM_INCDIR") {
+            builder = builder.clang_arg(format!("-I{}", incdir));
+        }
+    } else {
+        let slurm = pkg_config::Config::new().atleast_version("15.0").probe("slurm").unwrap();
+
+        println!("cargo:rustc-link-lib=dylib=slurmdb");
+
+        for ref path in &slurm.include_paths {
+            builder = builder.clang_arg(format!("-I{}", path.display()));
+        }
     }
 
     let bindings = builder
