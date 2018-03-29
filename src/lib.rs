@@ -831,7 +831,6 @@ pub struct slurmdb_job_cond_t {
     pub timelimit_max: u32,
     pub timelimit_min: u32,
     pub usage_end: time_t,
-    pub usage_start: time_t,
     pub used_nodes: *mut c_char,
     pub wckey_list: List,
     pub without_steps: u16,
@@ -848,6 +847,15 @@ impl JobFilters {
 
     pub fn step_list_mut(&mut self) -> &mut SlurmList<JobStepFilter> {
         unsafe { SlurmList::transmute_ptr_mut(&mut self.sys_data_mut().step_list) }
+    }
+
+    /// Add a filter on the earliest job "usage time".
+    ///
+    /// TODO: what is "usage time" really?
+    pub fn usage_start(&mut self, time: DateTime<Utc>) -> &Self {
+        self.sys_data_mut().without_usage_truncation = 0;
+        self.sys_data_mut().usage_start = time.timestamp() as _;
+        self
     }
 
     /// Access the list of user ID numbers that will match this set of filters.
