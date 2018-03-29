@@ -445,14 +445,14 @@ macro_rules! make_owned_version {
 /// other core structures exposed by this crate, this type represents a
 /// *borrowed* reference to a list.
 #[derive(Debug)]
-pub struct SlurmList<T>(*mut slurm_sys::xlist, PhantomData<T>);
+pub struct SlurmList<T>(slurm_sys::List, PhantomData<T>);
 
 impl<T> SlurmList<T> {
-    unsafe fn transmute_ptr<'a>(ptr: &'a *mut slurm_sys::xlist) -> &'a Self {
+    unsafe fn transmute_ptr<'a>(ptr: &'a slurm_sys::List) -> &'a Self {
         std::mem::transmute(ptr)
     }
 
-    unsafe fn transmute_ptr_mut<'a>(ptr: &'a mut *mut slurm_sys::xlist) -> &'a mut Self {
+    unsafe fn transmute_ptr_mut<'a>(ptr: &'a mut slurm_sys::List) -> &'a mut Self {
         std::mem::transmute(ptr)
     }
 }
