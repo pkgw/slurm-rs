@@ -23,7 +23,7 @@ include!(concat!(env!("OUT_DIR"), "/features.rs"));
 /// `slurm_list_create` that want a deallocator argument. `slurm_xfree`
 /// doesn't work because (1) it takes a pointer *to a* pointer, so that it can
 /// zero it out; and (2) it takes additional arguments populated from C
-/// preprocessor __FILE__/__LINE__ directives.
+/// preprocessor `__FILE__` and `__LINE__` directives.
 #[no_mangle]
 pub extern fn slurmrs_free(ptr: *mut std::os::raw::c_void) {
     let mut copy = ptr;
