@@ -36,13 +36,14 @@ fn main() {
     }
 
     let bindings = builder
+        .whitelist_type("job_.*")
         .whitelist_type("slurm_.*")
         .whitelist_type("slurmdb_.*")
         .whitelist_function("slurm_.*")
         .whitelist_function("slurmdb_.*")
-        .whitelist_var("SLURM.*")
         .whitelist_var("ESCRIPT.*")
         .whitelist_var("ESLURM.*")
+        .whitelist_var("SLURM.*")
         .whitelist_var("SLURMDB.*")
         .whitelist_var("SLURMRS.*")
         .rustfmt_bindings(true)
