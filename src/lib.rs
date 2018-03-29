@@ -322,7 +322,7 @@ pub trait UnownedFromSlurmPointer {
 macro_rules! make_job_state_enum {
     ($(<$rustname:ident, $shortcode:ident, $sysname:path, $doc:expr;>),*) => {
         /// States that a job or job step can be in.
-        #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+        #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
         pub enum JobState {
             $(
                 #[doc=$doc] $rustname,
@@ -997,7 +997,6 @@ pub struct slurmdb_job_rec_t {
     pub admin_comment: *mut c_char,
     pub alloc_gres: *mut c_char,
     pub alloc_nodes: u32,
-    pub array_job_id: u32,
     pub array_max_tasks: u32,
     pub array_task_id: u32,
     pub array_task_str: *mut c_char,
@@ -1138,6 +1137,16 @@ macro_rules! impl_job_step_record_shared_fields {
 impl_job_step_record_shared_fields!(JobRecord);
 
 impl JobRecord {
+    /// Get the unique identifier of the array group this job belonged to.
+    ///
+    /// Returns None if this job was not part of an array.
+    pub fn array_job_id(&self) -> Option<JobId> {
+        match self.sys_data().array_job_id {
+            0 => None,
+            other => Some(other),
+        }
+    }
+
     /// Get the job's "eligible" time, or None if the job is not yet eligible to run.
     pub fn eligible_time(&self) -> Option<DateTime<Utc>> {
         match self.sys_data().eligible as i64 {
