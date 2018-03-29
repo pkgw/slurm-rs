@@ -318,6 +318,62 @@ pub trait UnownedFromSlurmPointer {
 }
 
 
+/// Helper for interfacing between the C `job_state` enum and our own type.
+macro_rules! make_job_state_enum {
+    ($(<$rustname:ident, $shortcode:ident, $sysname:path, $doc:expr;>),*) => {
+        /// States that a job or job step can be in.
+        #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+        pub enum JobState {
+            $(
+                #[doc=$doc] $rustname,
+            )*
+        }
+
+        impl JobState {
+            fn from_slurm(s: slurm_sys::job_states) -> Result<JobState, Error> {
+                match s {
+                    $(
+                        $sysname => Ok(JobState::$rustname),
+                    )*
+                    other => Err(format_err!("unrecognized job state code {}", other)),
+                }
+            }
+
+            #[allow(unused)]
+            fn to_slurm(&self) -> slurm_sys::job_states {
+                match self {
+                    $(
+                        &JobState::$rustname => $sysname,
+                    )*
+                }
+            }
+
+            pub fn shortcode(&self) -> &str {
+                match self {
+                    $(
+                        &JobState::$rustname => stringify!($shortcode),
+                    )*
+                }
+            }
+        }
+    }
+}
+
+make_job_state_enum! {
+    <Pending, PD, slurm_sys::job_states_JOB_PENDING, "The job has not yet started running.";>,
+    <Running, R, slurm_sys::job_states_JOB_RUNNING, "The job is running.";>,
+    <Suspended, S, slurm_sys::job_states_JOB_SUSPENDED, "The job has been suspended.";>,
+    <Complete, CG, slurm_sys::job_states_JOB_COMPLETE, "The job finished successfully.";>,
+    <Cancelled, CA, slurm_sys::job_states_JOB_CANCELLED, "The job was cancelled.";>,
+    <Failed, F, slurm_sys::job_states_JOB_FAILED, "The job finished unsuccessfully.";>,
+    <Timeout, TO, slurm_sys::job_states_JOB_TIMEOUT, "The job was killed because it exceeded its time allocation.";>,
+    <NodeFail, NF, slurm_sys::job_states_JOB_NODE_FAIL, "The node running the job failed.";>,
+    <Preempted, PR, slurm_sys::job_states_JOB_PREEMPTED, "The job was killed by preemption.";>,
+    <BootFail, BF, slurm_sys::job_states_JOB_BOOT_FAIL, "The job failed because Slurm failed to launch it.";>,
+    <Deadline, DL, slurm_sys::job_states_JOB_DEADLINE, "The job failed to start in time.";>,
+    <OutOfMemory, OM, slurm_sys::job_states_JOB_OOM, "The job was killed because it exceeded its memory allocation.";>
+}
+
 /// Helper for creating public structs that directly wrap Slurm API
 /// structures. Because we must use Slurm's internal allocator, these all wrap
 /// native pointers. It's a bit annoying but as far as I can tell it's what we
@@ -1000,6 +1056,9 @@ pub trait JobStepRecordSharedFields {
     /// Get the job/step's start time, or None if it has not yet started.
     fn start_time(&self) -> Option<DateTime<Utc>>;
 
+    /// Get the job/step's state.
+    fn state(&self) -> JobState;
+
     /// Get the wallclock time taken by the job/step: end time minus start time.
     ///
     /// Returns None if the job/step has not yet completed (or even started).
@@ -1060,6 +1119,10 @@ macro_rules! impl_job_step_record_shared_fields {
                     0 => None,
                     t => Some(Utc.timestamp(t, 0)),
                 }
+            }
+
+            fn state(&self) -> JobState {
+                JobState::from_slurm(self.sys_data().state).expect("unhandled job_state code")
             }
 
             fn wallclock_duration(&self) -> Option<Duration> {

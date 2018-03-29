@@ -47,7 +47,7 @@ fn inner() -> Result<i32, Error> {
     let jobs = db.get_jobs(&filter)?;
 
     for job in jobs.iter() {
-        println!("{} {}", job.job_id(), job.job_name());
+        println!("{} {} {}", job.job_id(), job.job_name(), job.state().shortcode());
     }
 
     Ok(0)
