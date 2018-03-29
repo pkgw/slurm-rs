@@ -24,5 +24,8 @@ failure_derive = "0.1"
 libc = "0.2"
 slurm-sys = { path = "slurm-sys", version = "0.1.0" }
 
+[build-dependencies]
+slurm-sys = { path = "slurm-sys", version = "0.1.0" } # needed to learn what C API provides
+
 [package.metadata.docs.rs]
 dependencies = ["libslurm-dev", "libslurmdb-dev"]
