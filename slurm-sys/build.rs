@@ -45,6 +45,7 @@ fn main() {
         .whitelist_var("ESLURM.*")
         .whitelist_var("SLURMDB.*")
         .whitelist_var("SLURMRS.*")
+        .rustfmt_bindings(true)
         .generate()
         .expect("Unable to generate bindings");
 
@@ -81,9 +82,11 @@ fn main() {
     }
 
     let mut state = State::Scanning;
+    let mut n_lines = 0;
 
     for maybe_line in bindings_buf.lines() {
         let line = maybe_line.expect(&format!("couldn't read bindgen output file {}", bindings_path.display()));
+        n_lines += 1;
 
         match state {
             State::Scanning => {
@@ -113,6 +116,9 @@ fn main() {
             }
         }
     }
+
+    // If rustfmt is unavailable, the output is all on two (very long) lines. Can't parse that.
+    assert!(n_lines > 100, "to build this crate you must install a functional \"rustfmt\" (see README.md)");
 
     writeln!(features_file, "];")
         .expect(&format!("couldn't write to features output file {}", features_path.display()));

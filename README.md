@@ -5,6 +5,13 @@ Rust bindings for the [Slurm workload manager](https://slurm.schedmd.com/).
 The API coverage is far from complete, but the basic framework is in place.
 
 
+## Building
+
+See the README for the `slurm-sys` subdirectory for some notes on how to build
+against your Slurm library correctly. You must have a functional `rustfmt`
+installed.
+
+
 ## Compatibility
 
 At the moment, this crate will work if compiled against Slurm 17.11. It
