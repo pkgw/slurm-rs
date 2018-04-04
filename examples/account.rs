@@ -73,10 +73,10 @@ fn inner(jobid: &str) -> Result<i32, Error> {
         for step in job.steps().iter() {
             println!("  step {} {}", step.step_id(), step.step_name());
 
-            if let Some(d) = job.wallclock_duration() {
+            if let Some(d) = step.wallclock_duration() {
                 println!("    wallclock runtime: {} s", d.num_seconds());
-                println!("    exit code: {}", job.exit_code().unwrap());
-            } else if let Some(t_st) = job.start_time() {
+                println!("    exit code: {}", step.exit_code().unwrap());
+            } else if let Some(t_st) = step.start_time() {
                 let wait = now.signed_duration_since(t_st);
                 println!("    step not yet finished; time since start: {} s", wait.num_seconds());
             } else {
