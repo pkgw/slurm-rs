@@ -1021,7 +1021,6 @@ pub struct slurmdb_job_rec_t {
     pub resv_name: *mut c_char,
     pub show_full: u32,
     pub steps: List,
-    pub timelimit: u32,
     pub track_steps: u16,
     pub tres_req_str: *mut c_char,
     pub uid: u32,
@@ -1174,6 +1173,11 @@ impl JobRecord {
     /// or None if the job has not yet become eligible to run.
     pub fn eligible_wait_duration(&self) -> Option<Duration> {
         self.eligible_time().map(|t| t.signed_duration_since(self.submit_time()))
+    }
+
+    /// Get the job's time limit in minutes.
+    pub fn time_limit(&self) -> u32 {
+        self.sys_data().timelimit
     }
 
     /// Get the wallclock time spent waiting for the job to start, or None

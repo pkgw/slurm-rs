@@ -70,6 +70,14 @@ fn inner(jobid: &str) -> Result<i32, Error> {
             println!("  still waiting to start");
         }
 
+        if let Some(t_st) = job.start_time() {
+            let t_limit = t_st + chrono::Duration::minutes(job.time_limit() as i64);
+            let remaining = t_limit.signed_duration_since(now).num_minutes();
+            if remaining > 0 {
+                println!("  time left until job hits time limit: {} min", remaining);
+            }
+        }
+
         for step in job.steps().iter() {
             println!("  step {} {}", step.step_id(), step.step_name());
 
