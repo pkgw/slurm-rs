@@ -2,10 +2,10 @@
 # Licensed under the MIT licene.
 
 [package]
-name = "slurmplus"
+name = "slurm"
 version = "0.1.0"
 authors = ["Peter Williams <peter@newton.cx>"]
-description = "A command-line tool for nice interaction with the Slurm workload manager."
+description = "Interface to the Slurm workload manager."
 homepage = "https://github.com/pkgw/slurm-rs"
 documentation = "https://docs.rs/slurm"
 repository = "https://github.com/pkgw/slurm-rs"
@@ -14,10 +14,17 @@ keywords = ["slurm"]
 categories = ["concurrency", "science"]
 license = "MIT"
 
-[workspace]
-
 [dependencies]
+chrono = "0.4"
+clap = "2.30"
 failure = "0.1"
 failure_derive = "0.1"
-slurm = { path = "slurm", version = "0.1.0" }
-structopt = "0.2"
+itertools = "0.7"
+libc = "0.2"
+slurm-sys = { path = "../slurm-sys", version = "0.1.0" }
+
+[build-dependencies]
+slurm-sys = { path = "../slurm-sys", version = "0.1.0" } # needed to learn what C API provides
+
+[package.metadata.docs.rs]
+dependencies = ["libslurm-dev", "libslurmdb-dev"]

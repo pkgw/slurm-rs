@@ -1,17 +1,16 @@
-# slurm-rs: slurm and slurmplus
+# slurm-rs
 
-Rust bindings for the [Slurm workload manager](https://slurm.schedmd.com/), and
-a command-line program that provides some useful functionality.
+Rust bindings for the [Slurm workload manager](https://slurm.schedmd.com/).
 
 The API coverage is far from complete, but the basic framework is in place.
 
 
 ## Building and Compatibility
 
-See the README for the `slurm-sys` subdirectory for some notes on how to build
-against your Slurm library correctly. You must have a functional `rustfmt`
-installed. You may also need to set some environment variables to allow the
-build script to locate your Slurm libraries and include files.
+See the README for the sibling `../slurm-sys` directory for some notes on how
+to build against your Slurm library correctly. You must have a functional
+`rustfmt` installed. You may also need to set some environment variables to
+allow the build script to locate your Slurm libraries and include files.
 
 At the moment, this crate is being developed against Slurm 17.11. The Slurm C
 API is not especially stable, so it is possible that this crate will fail to
