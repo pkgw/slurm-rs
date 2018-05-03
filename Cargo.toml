@@ -20,5 +20,7 @@ license = "MIT"
 chrono = "0.4"
 failure = "0.1"
 failure_derive = "0.1"
+itertools = "0.7"
 slurm = { path = "slurm", version = "0.1.0" }
 structopt = "0.2"
+users = "0.6"

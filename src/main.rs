@@ -5,20 +5,27 @@
 
 extern crate chrono;
 extern crate failure;
+extern crate itertools;
 extern crate slurm;
 #[macro_use] extern crate structopt;
+extern crate users;
 
 use failure::Error;
 use std::process;
 use structopt::StructOpt;
 
 
+mod recent;
 mod status;
 
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "slurmplus", about = "Better commands for interacting with Slurm.")]
 enum SlurmPlusCli {
+    #[structopt(name = "recent")]
+    /// Summarize recently-run jobs
+    Recent(recent::RecentCommand),
+
     #[structopt(name = "status")]
     /// Get the status of a job
     Status(status::StatusCommand),
@@ -27,6 +34,7 @@ enum SlurmPlusCli {
 impl SlurmPlusCli {
     fn cli(self) -> Result<i32, Error> {
         match self {
+            SlurmPlusCli::Recent(cmd) => cmd.cli(),
             SlurmPlusCli::Status(cmd) => cmd.cli(),
         }
     }
