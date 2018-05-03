@@ -3,6 +3,7 @@
 
 //! The main CLI driver logic.
 
+extern crate chrono;
 extern crate failure;
 extern crate slurm;
 #[macro_use] extern crate structopt;
@@ -12,29 +13,21 @@ use std::process;
 use structopt::StructOpt;
 
 
-#[derive(Debug, StructOpt)]
-pub struct RecentCommand {
-}
-
-impl RecentCommand {
-    fn cli(self) -> Result<i32, Error> {
-        Ok(0)
-    }
-}
+mod status;
 
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "slurmplus", about = "Better commands for interacting with Slurm.")]
-pub enum SlurmPlusCli {
-    #[structopt(name = "recent")]
-    /// Summarize recently-run jobs
-    Recent(RecentCommand),
+enum SlurmPlusCli {
+    #[structopt(name = "status")]
+    /// Get the status of a job
+    Status(status::StatusCommand),
 }
 
 impl SlurmPlusCli {
     fn cli(self) -> Result<i32, Error> {
         match self {
-            SlurmPlusCli::Recent(cmd) => cmd.cli(),
+            SlurmPlusCli::Status(cmd) => cmd.cli(),
         }
     }
 }

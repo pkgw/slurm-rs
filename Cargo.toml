@@ -17,6 +17,7 @@ license = "MIT"
 [workspace]
 
 [dependencies]
+chrono = "0.4"
 failure = "0.1"
 failure_derive = "0.1"
 slurm = { path = "slurm", version = "0.1.0" }
