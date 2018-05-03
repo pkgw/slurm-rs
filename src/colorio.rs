@@ -28,7 +28,10 @@ pub enum Style {
     Plain,
 
     /// Style some text with a red color.
-    Red
+    Red,
+
+    /// Style some text with a yellow color.
+    Yellow,
 }
 
 
@@ -65,6 +68,11 @@ macro_rules! cprint {
         use $crate::colorio::{Stream, Style};
         $cio.print_core(Stream::Stdout, Style::Red, format_args!($($fmt_args),*))
     }};
+
+    ($cio:expr, yellow, $($fmt_args:expr),*) => {{
+        use $crate::colorio::{Stream, Style};
+        $cio.print_core(Stream::Stdout, Style::Yellow, format_args!($($fmt_args),*))
+    }};
 }
 
 macro_rules! cprintln {
@@ -94,6 +102,11 @@ macro_rules! ecprint {
         use $crate::colorio::{Stream, Style};
         $cio.print_core(Stream::Stderr, Style::Red, format_args!($($fmt_args),*))
     }};
+
+    ($cio:expr, yellow, $($fmt_args:expr),*) => {{
+        use $crate::colorio::{Stream, Style};
+        $cio.print_core(Stream::Stderr, Style::Yellow, format_args!($($fmt_args),*))
+    }};
 }
 
 macro_rules! ecprintln {
@@ -110,6 +123,7 @@ pub struct ColorIo {
     red: ColorSpec,
     green: ColorSpec,
     highlight: ColorSpec,
+    yellow: ColorSpec,
 }
 
 
@@ -118,16 +132,19 @@ impl ColorIo {
         let stdout = StandardStream::stdout(ColorChoice::Auto);
         let stderr = StandardStream::stderr(ColorChoice::Auto);
 
-        let mut red = ColorSpec::new();
-        red.set_fg(Some(Color::Red)).set_bold(true);
-
         let mut green = ColorSpec::new();
         green.set_fg(Some(Color::Green)).set_bold(true);
 
         let mut highlight = ColorSpec::new();
         highlight.set_bold(true);
 
-        ColorIo { stdout, stderr, red, green, highlight }
+        let mut red = ColorSpec::new();
+        red.set_fg(Some(Color::Red)).set_bold(true);
+
+        let mut yellow = ColorSpec::new();
+        yellow.set_fg(Some(Color::Yellow)).set_bold(true);
+
+        ColorIo { stdout, stderr, green, highlight, red, yellow }
     }
 
     pub fn print_error(&mut self, err: Error) {
@@ -171,12 +188,16 @@ impl ColorIo {
             Style::Red => {
                 let _r = stream.set_color(&self.red);
             },
+
+            Style::Yellow => {
+                let _r = stream.set_color(&self.yellow);
+            },
         }
 
         let _r = write!(stream, "{}", args);
 
         match style {
-            Style::Green | Style::Highlight | Style::Red => {
+            Style::Green | Style::Highlight | Style::Red | Style::Yellow => {
                 let _r = stream.reset();
             },
 

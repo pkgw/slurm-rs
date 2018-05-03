@@ -20,10 +20,13 @@ pub fn colorize_state(cio: &mut ColorIo, state: JobState) {
             cprint!(cio, green, "{:2}", state.shortcode());
         },
 
-        JobState::Suspended | JobState::Cancelled | JobState::Failed |
-        JobState::Timeout | JobState::NodeFail | JobState::Preempted |
+        JobState::Cancelled | JobState::Failed | JobState::NodeFail |
         JobState::BootFail | JobState::Deadline | JobState::OutOfMemory => {
             cprint!(cio, red, "{:2}", state.shortcode());
+        },
+
+        JobState::Suspended | JobState::Timeout | JobState::Preempted => {
+            cprint!(cio, yellow, "{:2}", state.shortcode());
         },
     }
 }
