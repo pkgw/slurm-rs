@@ -8,7 +8,7 @@ use chrono::{Duration, Utc};
 use colorio::ColorIo;
 use failure::Error;
 use itertools::Itertools;
-use slurm::{self, JobStepRecordSharedFields};
+use slurm::{self, JobState, JobStepRecordSharedFields};
 use std::collections::HashMap;
 use users;
 
@@ -29,38 +29,78 @@ impl RecentCommand {
         filter.userid_list_mut().append(format!("{}", uid));
         filter.usage_start(min_start);
 
+        let mut grouped = HashMap::new();
         let db = slurm::DatabaseConnectionOwned::new()?;
         let jobs = db.get_jobs(&filter)?;
 
-        for (arrayid, group) in &jobs.iter().group_by(|job| job.array_job_id().unwrap_or_else(|| job.job_id())) {
-            let mut n_jobs = 0;
-            let mut last_state = slurm::JobState::Failed;
-            let mut states = HashMap::new();
+        for job in jobs.iter() {
+            let group_id = job.array_job_id().unwrap_or_else(|| job.job_id());
+            let group_info = grouped.entry(group_id).or_insert_with(|| JobGroupInfo::new(group_id));
+            group_info.accumulate(&job);
+        }
 
-            for job in group {
-                if n_jobs == 0 {
-                    cprint!(cio, green, "{} {}:", arrayid, job.job_name());
-                    cprint!(cio, pl, " ");
-                }
-
-                n_jobs += 1;
-                last_state = job.state();
-                let slot = states.entry(last_state).or_insert(0);
-                *slot += 1;
-            }
-
-            if n_jobs == 1 {
-                cprintln!(cio, pl, "{:2}", last_state.shortcode());
-            } else {
-                let seen_states = states.keys().sorted();
-                let text = seen_states
-                    .iter()
-                    .map(|s| format!("{} {}", states.get(s).unwrap(), s.shortcode()))
-                    .join(", ");
-                cprintln!(cio, pl, "{} ({} total)", text, n_jobs);
-            }
+        for group_info in grouped.values() {
+            group_info.emit(cio);
         }
 
         Ok(0)
+    }
+}
+
+struct JobGroupInfo {
+    id: slurm::JobId,
+    n_jobs: usize,
+    states: HashMap<JobState, usize>,
+}
+
+impl JobGroupInfo {
+    pub fn new(id: slurm::JobId) -> Self {
+        JobGroupInfo {
+            id,
+            n_jobs: 0,
+            states: HashMap::new(),
+        }
+    }
+
+    pub fn accumulate(&mut self, job: &slurm::JobRecord) {
+        self.n_jobs += 1;
+        let slot = self.states.entry(job.state()).or_insert(0);
+        *slot += 1;
+    }
+
+    pub fn emit(&self, cio: &mut ColorIo) {
+        cprint!(cio, hl, "{}:", self.id);
+
+        if self.n_jobs == 1 {
+            let state = self.states.keys().next().unwrap();
+            cprint!(cio, pl, " ");
+            colorize_state(cio, *state);
+            cprintln!(cio, pl, "");
+        } else {
+            let seen_states = self.states.keys().sorted();
+            let text = seen_states
+                .iter()
+                .map(|s| format!("{} {}", self.states.get(s).unwrap(), s.shortcode()))
+                .join(", ");
+            cprintln!(cio, pl, " {} ({} total)", text, self.n_jobs);
+        }
+    }
+}
+
+fn colorize_state(cio: &mut ColorIo, state: JobState) {
+    match state {
+        JobState::Pending => {
+            cprint!(cio, pl, "{:2}", state.shortcode());
+        },
+
+        JobState::Running | JobState::Complete => {
+            cprint!(cio, green, "{:2}", state.shortcode());
+        },
+
+        JobState::Suspended | JobState::Cancelled | JobState::Failed |
+        JobState::Timeout | JobState::NodeFail | JobState::Preempted |
+        JobState::BootFail | JobState::Deadline | JobState::OutOfMemory => {
+            cprint!(cio, red, "{:2}", state.shortcode());
+        },
     }
 }
