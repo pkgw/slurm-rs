@@ -79,11 +79,20 @@ impl JobGroupInfo {
             cprintln!(cio, pl, "");
         } else {
             let seen_states = self.states.keys().sorted();
-            let text = seen_states
-                .iter()
-                .map(|s| format!("{} {}", self.states.get(s).unwrap(), s.shortcode()))
-                .join(", ");
-            cprintln!(cio, pl, " {} ({} total)", text, self.n_jobs);
+            let mut first = true;
+
+            for state in seen_states {
+                if first {
+                    first = false;
+                } else {
+                    cprint!(cio, pl, ",");
+                }
+
+                cprint!(cio, pl, " {} ", self.states.get(state).unwrap());
+                util::colorize_state(cio, *state);
+            }
+
+            cprintln!(cio, pl, " ({} total)", self.n_jobs);
         }
     }
 }

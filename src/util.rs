@@ -13,20 +13,20 @@ use slurm::{JobState};
 pub fn colorize_state(cio: &mut ColorIo, state: JobState) {
     match state {
         JobState::Pending => {
-            cprint!(cio, pl, "{:2}", state.shortcode());
+            cprint!(cio, pl, "{}", state.shortcode());
         },
 
         JobState::Running | JobState::Complete => {
-            cprint!(cio, green, "{:2}", state.shortcode());
+            cprint!(cio, green, "{}", state.shortcode());
         },
 
         JobState::Cancelled | JobState::Failed | JobState::NodeFail |
         JobState::BootFail | JobState::Deadline | JobState::OutOfMemory => {
-            cprint!(cio, red, "{:2}", state.shortcode());
+            cprint!(cio, red, "{}", state.shortcode());
         },
 
         JobState::Suspended | JobState::Timeout | JobState::Preempted => {
-            cprint!(cio, yellow, "{:2}", state.shortcode());
+            cprint!(cio, yellow, "{}", state.shortcode());
         },
     }
 }
