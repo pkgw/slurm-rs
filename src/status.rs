@@ -12,6 +12,7 @@ use chrono::{Duration, Utc};
 use colorio::ColorIo;
 use failure::Error;
 use slurm::{self, JobStepRecordSharedFields};
+use util;
 
 
 #[derive(Debug, StructOpt)]
@@ -31,7 +32,9 @@ impl StatusCommand {
 
         for job in jobs.iter() {
             cprint!(cio, hl, "{}", job.job_id());
-            cprintln!(cio, pl, " {}", job.job_name());
+            cprint!(cio, pl, " {} ", job.job_name());
+            util::colorize_state(cio, job.state());
+            cprintln!(cio, pl, "");
 
             if let Some(d) = job.eligible_wait_duration() {
                 cprintln!(cio, pl, "  time for job to become eligible to run: {} s", d.num_seconds());

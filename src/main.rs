@@ -18,6 +18,7 @@ use structopt::StructOpt;
 #[macro_use] mod colorio; // keep first to get macros
 mod recent;
 mod status;
+mod util;
 
 use colorio::ColorIo;
 

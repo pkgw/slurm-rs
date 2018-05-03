@@ -11,6 +11,7 @@ use itertools::Itertools;
 use slurm::{self, JobState, JobStepRecordSharedFields};
 use std::collections::HashMap;
 use users;
+use util;
 
 
 #[derive(Debug, StructOpt)]
@@ -74,7 +75,7 @@ impl JobGroupInfo {
         if self.n_jobs == 1 {
             let state = self.states.keys().next().unwrap();
             cprint!(cio, pl, " ");
-            colorize_state(cio, *state);
+            util::colorize_state(cio, *state);
             cprintln!(cio, pl, "");
         } else {
             let seen_states = self.states.keys().sorted();
@@ -84,23 +85,5 @@ impl JobGroupInfo {
                 .join(", ");
             cprintln!(cio, pl, " {} ({} total)", text, self.n_jobs);
         }
-    }
-}
-
-fn colorize_state(cio: &mut ColorIo, state: JobState) {
-    match state {
-        JobState::Pending => {
-            cprint!(cio, pl, "{:2}", state.shortcode());
-        },
-
-        JobState::Running | JobState::Complete => {
-            cprint!(cio, green, "{:2}", state.shortcode());
-        },
-
-        JobState::Suspended | JobState::Cancelled | JobState::Failed |
-        JobState::Timeout | JobState::NodeFail | JobState::Preempted |
-        JobState::BootFail | JobState::Deadline | JobState::OutOfMemory => {
-            cprint!(cio, red, "{:2}", state.shortcode());
-        },
     }
 }
