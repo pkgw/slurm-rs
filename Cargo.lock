@@ -346,6 +346,7 @@ dependencies = [
  "itertools 0.7.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "slurm 0.1.0",
  "structopt 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "termcolor 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "users 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

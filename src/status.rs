@@ -11,6 +11,7 @@ running and completed jobs.
 use chrono::{Duration, Utc};
 use failure::Error;
 use slurm::{self, JobStepRecordSharedFields};
+use termcolor::StandardStream;
 
 
 #[derive(Debug, StructOpt)]
@@ -20,7 +21,7 @@ pub struct StatusCommand {
 }
 
 impl StatusCommand {
-    pub fn cli(self) -> Result<i32, Error> {
+    pub fn cli(self, _stdout: StandardStream) -> Result<i32, Error> {
         let mut filter = slurm::JobFiltersOwned::default();
         filter.step_list_mut().append(slurm::JobStepFilterOwned::new(self.jobid));
 

@@ -8,11 +8,14 @@ extern crate failure;
 extern crate itertools;
 extern crate slurm;
 #[macro_use] extern crate structopt;
+extern crate termcolor;
 extern crate users;
 
 use failure::Error;
+use std::io::Write;
 use std::process;
 use structopt::StructOpt;
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 
 mod recent;
@@ -32,10 +35,10 @@ enum SlurmPlusCli {
 }
 
 impl SlurmPlusCli {
-    fn cli(self) -> Result<i32, Error> {
+    fn cli(self, stdout: StandardStream) -> Result<i32, Error> {
         match self {
-            SlurmPlusCli::Recent(cmd) => cmd.cli(),
-            SlurmPlusCli::Status(cmd) => cmd.cli(),
+            SlurmPlusCli::Recent(cmd) => cmd.cli(stdout),
+            SlurmPlusCli::Status(cmd) => cmd.cli(stdout),
         }
     }
 }
@@ -44,13 +47,32 @@ impl SlurmPlusCli {
 fn main() {
     let program = SlurmPlusCli::from_args();
 
-    process::exit(match program.cli() {
+    let stdout = StandardStream::stdout(ColorChoice::Auto);
+    let mut stderr = StandardStream::stderr(ColorChoice::Auto);
+
+    process::exit(match program.cli(stdout) {
         Ok(code) => code,
 
         Err(e) => {
-            eprintln!("slurmplus: the command failed");
+            let mut first = true;
+
+            let mut red = ColorSpec::new();
+            red.set_fg(Some(Color::Red)).set_bold(true);
+
             for cause in e.causes() {
-                eprintln!("  caused by: {}", cause);
+                if first {
+                    let _r = stderr.set_color(&red);
+                    let _r = write!(stderr, "error:");
+                    let _r = stderr.reset();
+                    let _r = writeln!(stderr, " {}", cause);
+                    first = false;
+                } else {
+                    let _r = write!(stderr, "  ");
+                    let _r = stderr.set_color(&red);
+                    let _r = write!(stderr, "caused by:");
+                    let _r = stderr.reset();
+                    let _r = writeln!(stderr, " {}", cause);
+                }
             }
             1
         },

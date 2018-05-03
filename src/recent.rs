@@ -9,6 +9,7 @@ use failure::Error;
 use itertools::Itertools;
 use slurm::{self, JobStepRecordSharedFields};
 use std::collections::HashMap;
+use termcolor::StandardStream;
 use users;
 
 
@@ -17,7 +18,7 @@ pub struct RecentCommand {
 }
 
 impl RecentCommand {
-    pub fn cli(self) -> Result<i32, Error> {
+    pub fn cli(self, _stdout: StandardStream) -> Result<i32, Error> {
         let now = Utc::now();
         let min_start = now - Duration::days(7);
 
