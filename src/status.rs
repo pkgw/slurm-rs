@@ -9,9 +9,9 @@ running and completed jobs.
 */
 
 use chrono::{Duration, Utc};
+use colorio::ColorIo;
 use failure::Error;
 use slurm::{self, JobStepRecordSharedFields};
-use termcolor::StandardStream;
 
 
 #[derive(Debug, StructOpt)]
@@ -21,7 +21,7 @@ pub struct StatusCommand {
 }
 
 impl StatusCommand {
-    pub fn cli(self, _stdout: StandardStream) -> Result<i32, Error> {
+    pub fn cli(self, cio: &mut ColorIo) -> Result<i32, Error> {
         let mut filter = slurm::JobFiltersOwned::default();
         filter.step_list_mut().append(slurm::JobStepFilterOwned::new(self.jobid));
 
@@ -30,21 +30,22 @@ impl StatusCommand {
         let now = Utc::now();
 
         for job in jobs.iter() {
-            println!("{} {}", job.job_id(), job.job_name());
+            cprint!(cio, hl, "{}", job.job_id());
+            cprintln!(cio, pl, " {}", job.job_name());
 
             if let Some(d) = job.eligible_wait_duration() {
-                println!("  time for job to become eligible to run: {} s", d.num_seconds());
+                cprintln!(cio, pl, "  time for job to become eligible to run: {} s", d.num_seconds());
             } else {
                 let wait = now.signed_duration_since(job.submit_time());
-                println!("  job not yet eligible to run; time since submission: {} s", wait.num_seconds());
+                cprintln!(cio, pl, "  job not yet eligible to run; time since submission: {} s", wait.num_seconds());
                 continue;
             }
 
             if let Some(d) = job.wait_duration() {
-                println!("  wait time after eligibility: {} s", d.num_seconds());
+                cprintln!(cio, pl, "  wait time after eligibility: {} s", d.num_seconds());
             } else if let Some(t_el) = job.eligible_time() {
                 let wait = now.signed_duration_since(t_el);
-                println!("  job not yet started; time since eligibility: {} s", wait.num_seconds());
+                cprintln!(cio, pl, "  job not yet started; time since eligibility: {} s", wait.num_seconds());
                 continue;
             }
 
@@ -52,27 +53,28 @@ impl StatusCommand {
                 let t_limit = t_st + Duration::minutes(job.time_limit() as i64);
                 let remaining = t_limit.signed_duration_since(now).num_minutes();
                 if remaining > 0 {
-                    println!("  time left until job hits time limit: {} min", remaining);
+                    cprintln!(cio, pl, "  time left until job hits time limit: {} min", remaining);
                 }
             }
 
             for step in job.steps().iter() {
-                println!("  step {} {}", step.step_id(), step.step_name());
+                cprint!(cio, hl, "  step {}", step.step_id());
+                cprintln!(cio, pl, " {}", step.step_name());
 
                 if let Some(d) = step.wallclock_duration() {
-                    println!("    wallclock runtime: {} s", d.num_seconds());
-                    println!("    exit code: {}", step.exit_code().unwrap());
+                    cprintln!(cio, pl, "    wallclock runtime: {} s", d.num_seconds());
+                    cprintln!(cio, pl, "    exit code: {}", step.exit_code().unwrap());
                 } else if let Some(t_st) = step.start_time() {
                     let wait = now.signed_duration_since(t_st);
-                    println!("    step not yet finished; time since start: {} s", wait.num_seconds());
+                    cprintln!(cio, pl, "    step not yet finished; time since start: {} s", wait.num_seconds());
                 } else {
-                    println!("    step not yet finished");
+                    cprintln!(cio, pl, "    step not yet finished");
                 }
 
                 if let Some(b) = step.max_vm_size() {
-                    println!("    max VM size: {:.2} MiB", (b as f64) / 1024.);
+                    cprintln!(cio, pl, "    max VM size: {:.2} MiB", (b as f64) / 1024.);
                 } else {
-                    println!("    max VM size not available (probably because step not finished)");
+                    cprintln!(cio, pl, "    max VM size not available (probably because step not finished)");
                 }
             }
         }

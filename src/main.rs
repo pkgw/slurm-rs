@@ -12,14 +12,14 @@ extern crate termcolor;
 extern crate users;
 
 use failure::Error;
-use std::io::Write;
 use std::process;
 use structopt::StructOpt;
-use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
-
+#[macro_use] mod colorio; // keep first to get macros
 mod recent;
 mod status;
+
+use colorio::ColorIo;
 
 
 #[derive(Debug, StructOpt)]
@@ -35,10 +35,10 @@ enum SlurmPlusCli {
 }
 
 impl SlurmPlusCli {
-    fn cli(self, stdout: StandardStream) -> Result<i32, Error> {
+    fn cli(self, cio: &mut ColorIo) -> Result<i32, Error> {
         match self {
-            SlurmPlusCli::Recent(cmd) => cmd.cli(stdout),
-            SlurmPlusCli::Status(cmd) => cmd.cli(stdout),
+            SlurmPlusCli::Recent(cmd) => cmd.cli(cio),
+            SlurmPlusCli::Status(cmd) => cmd.cli(cio),
         }
     }
 }
@@ -46,34 +46,13 @@ impl SlurmPlusCli {
 
 fn main() {
     let program = SlurmPlusCli::from_args();
+    let mut cio = ColorIo::new();
 
-    let stdout = StandardStream::stdout(ColorChoice::Auto);
-    let mut stderr = StandardStream::stderr(ColorChoice::Auto);
-
-    process::exit(match program.cli(stdout) {
+    process::exit(match program.cli(&mut cio) {
         Ok(code) => code,
 
         Err(e) => {
-            let mut first = true;
-
-            let mut red = ColorSpec::new();
-            red.set_fg(Some(Color::Red)).set_bold(true);
-
-            for cause in e.causes() {
-                if first {
-                    let _r = stderr.set_color(&red);
-                    let _r = write!(stderr, "error:");
-                    let _r = stderr.reset();
-                    let _r = writeln!(stderr, " {}", cause);
-                    first = false;
-                } else {
-                    let _r = write!(stderr, "  ");
-                    let _r = stderr.set_color(&red);
-                    let _r = write!(stderr, "caused by:");
-                    let _r = stderr.reset();
-                    let _r = writeln!(stderr, " {}", cause);
-                }
-            }
+            cio.print_error(e);
             1
         },
     });

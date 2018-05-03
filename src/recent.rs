@@ -5,11 +5,11 @@
  */
 
 use chrono::{Duration, Utc};
+use colorio::ColorIo;
 use failure::Error;
 use itertools::Itertools;
 use slurm::{self, JobStepRecordSharedFields};
 use std::collections::HashMap;
-use termcolor::StandardStream;
 use users;
 
 
@@ -18,7 +18,7 @@ pub struct RecentCommand {
 }
 
 impl RecentCommand {
-    pub fn cli(self, _stdout: StandardStream) -> Result<i32, Error> {
+    pub fn cli(self, cio: &mut ColorIo) -> Result<i32, Error> {
         let now = Utc::now();
         let min_start = now - Duration::days(7);
 
@@ -39,7 +39,8 @@ impl RecentCommand {
 
             for job in group {
                 if n_jobs == 0 {
-                    print!("{} {}: ", arrayid, job.job_name());
+                    cprint!(cio, green, "{} {}:", arrayid, job.job_name());
+                    cprint!(cio, pl, " ");
                 }
 
                 n_jobs += 1;
@@ -49,14 +50,14 @@ impl RecentCommand {
             }
 
             if n_jobs == 1 {
-                println!("{:2}", last_state.shortcode());
+                cprintln!(cio, pl, "{:2}", last_state.shortcode());
             } else {
                 let seen_states = states.keys().sorted();
                 let text = seen_states
                     .iter()
                     .map(|s| format!("{} {}", states.get(s).unwrap(), s.shortcode()))
                     .join(", ");
-                println!("{} ({} total)", text, n_jobs);
+                cprintln!(cio, pl, "{} ({} total)", text, n_jobs);
             }
         }
 
