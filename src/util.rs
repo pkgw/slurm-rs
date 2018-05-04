@@ -5,6 +5,7 @@
 
  */
 
+use chrono::Duration;
 use colorio::ColorIo;
 use slurm::{JobState};
 
@@ -16,7 +17,11 @@ pub fn colorize_state(cio: &mut ColorIo, state: JobState) {
             cprint!(cio, pl, "{}", state.shortcode());
         },
 
-        JobState::Running | JobState::Complete => {
+        JobState::Running => {
+            cprint!(cio, hl, "{}", state.shortcode());
+        },
+
+        JobState::Complete => {
             cprint!(cio, green, "{}", state.shortcode());
         },
 
@@ -30,3 +35,18 @@ pub fn colorize_state(cio: &mut ColorIo, state: JobState) {
         },
     }
 }
+
+
+/// Express a duration in text, approximately.
+pub fn dur_to_text(dur: &Duration) -> String {
+    if dur.num_days() > 2 {
+        format!("{} days", dur.num_days())
+    } else if dur.num_hours() > 2 {
+        format!("{} hours", dur.num_hours())
+    } else if dur.num_minutes() > 2 {
+        format!("{} minutes", dur.num_minutes())
+    } else {
+        format!("{} seconds", dur.num_seconds())
+    }
+}
+
