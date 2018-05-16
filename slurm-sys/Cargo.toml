@@ -22,3 +22,6 @@ pkg-config = "^0.3"
 
 [package.metadata.docs.rs]
 dependencies = ["libslurm-dev", "libslurmdb-dev"]
+# Hack to get us building on docs.rs
+rustc-args = ["--cfg", "slurmrs_on_docs_rs"]
+rustdoc-args = ["--cfg", "slurmrs_on_docs_rs"]

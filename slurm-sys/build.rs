@@ -16,8 +16,15 @@ fn main() {
     let mut builder = bindgen::Builder::default()
         .header("src/wrapper.h");
 
-    // Some Slurm installs don't have a pkg-config file.
-    if let Ok(libdir) = env::var("SLURM_LIBDIR") {
+    // The version of slurm that we can install on docs.rs (Debian Jessie)
+    // doesn't come with a pkg-config file, and there's (currently) no
+    // mechanism to set the $SLURM_LIBDIR environment variable, so we have a
+    // special-case hack to get our docs building (see Cargo.toml):
+    if cfg!(slurmrs_on_docs_rs) {
+        println!("cargo:rustc-link-lib=dylib=slurm");
+        println!("cargo:rustc-link-lib=dylib=slurmdb");
+    } else if let Ok(libdir) = env::var("SLURM_LIBDIR") {
+        // Some Slurm installs don't have a pkg-config file.
         println!("cargo:rustc-link-search=native={}", libdir);
         println!("cargo:rustc-link-lib=dylib=slurm");
         println!("cargo:rustc-link-lib=dylib=slurmdb");

@@ -11,9 +11,11 @@ enum {
     SLURMRS_NO_VAL = NO_VAL,
 };
 
+#ifdef NO_VAL64
 enum {
     SLURMRS_NO_VAL64 = NO_VAL64,
 };
+#endif
 
 /* The official API doesn't expose the memory management functions,
  * but we need them: see discussion in the Rust docs. */
