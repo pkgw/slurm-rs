@@ -25,3 +25,8 @@ slurm = { path = "slurm", version = "0.1.1" }
 structopt = "0.2"
 termcolor = "0.3"
 users = "0.6"
+
+[package.metadata.docs.rs]
+# Hack to get us building on docs.rs:
+rustc-args = ["--cfg", "slurmrs_on_docs_rs"]
+rustdoc-args = ["--cfg", "slurmrs_on_docs_rs"]
