@@ -1,7 +1,28 @@
 // Copyright 2017-2018 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT license.
 
-//! The version requirement here is totally made up.
+//! The Slurm version requirement here is totally made up.
+//!
+//! I want the docs of slurm-rs to be available on docs.rs, which requires us
+//! to be able to compile this bindings module on that platform. The code
+//! doesn't need to be *runnable*, but we need to be able to build it.
+//! Unsurprisingly, the docs.rs VM does not happen to have libslurm installed,
+//! and it currently looks unlikely that there will ever be a mechanism to
+//! install it ourselves. Therefore we undertake a massive hack: we download a
+//! pre-generated version of the binding file rather than creating it with
+//! bindgen, and we don't have this module link with any libraries. This would
+//! be a disaster if we actually wanted to run the resulting code, but we
+//! don't.
+//!
+//! In this case we download the pre-generated file using `wget` since it is
+//! available on docs.rs and we avoid having to link this file with all sorts
+//! of network libraries. We could store it in Git, but the file is big and I
+//! want to avoid the possibility of confusion.
+//!
+//! The other thing is that this file needs to be able to know that it's being
+//! built on docs.rs in order to activate the hack! That's done by (ab)using
+//! the `rustc_args` and `rustdoc_args` properties of the
+//! `package.metadata.docs.rs` section of Cargo.toml.
 
 extern crate bindgen;
 extern crate pkg_config;
@@ -11,18 +32,27 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::PathBuf;
+use std::process::Command;
+
+const PREBUILT_BINDINGS_URL: &str = "https://gist.github.com/pkgw/40e36f9dc0d771323205fc0617ac7141/\
+                                     raw/6405dba98cd0eec7fab483b3d090b919e1383094/bindings.rs";
 
 fn main() {
+    let mut do_the_bindgen = true;
     let mut builder = bindgen::Builder::default()
         .header("src/wrapper.h");
+    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let bindings_path = out_dir.join("bindings.rs");
 
-    // The version of slurm that we can install on docs.rs (Debian Jessie)
-    // doesn't come with a pkg-config file, and there's (currently) no
-    // mechanism to set the $SLURM_LIBDIR environment variable, so we have a
-    // special-case hack to get our docs building (see Cargo.toml):
     if cfg!(slurmrs_on_docs_rs) {
-        println!("cargo:rustc-link-lib=dylib=slurm");
-        println!("cargo:rustc-link-lib=dylib=slurmdb");
+        // Activate the hack!
+        do_the_bindgen = false;
+        Command::new("wget")
+            .arg("-O")
+            .arg(&bindings_path)
+            .arg(PREBUILT_BINDINGS_URL)
+            .status()
+            .expect("failed to execute process");
     } else if let Ok(libdir) = env::var("SLURM_LIBDIR") {
         // Some Slurm installs don't have a pkg-config file.
         println!("cargo:rustc-link-search=native={}", libdir);
@@ -42,27 +72,26 @@ fn main() {
         }
     }
 
-    let bindings = builder
-        .whitelist_type("job_.*")
-        .whitelist_type("slurm_.*")
-        .whitelist_type("slurmdb_.*")
-        .whitelist_function("slurm_.*")
-        .whitelist_function("slurmdb_.*")
-        .whitelist_var("ESCRIPT.*")
-        .whitelist_var("ESLURM.*")
-        .whitelist_var("SLURM.*")
-        .whitelist_var("SLURMDB.*")
-        .whitelist_var("SLURMRS.*")
-        .rustfmt_bindings(true)
-        .generate()
-        .expect("Unable to generate bindings");
+    if do_the_bindgen {
+        let bindings = builder
+            .whitelist_type("job_.*")
+            .whitelist_type("slurm_.*")
+            .whitelist_type("slurmdb_.*")
+            .whitelist_function("slurm_.*")
+            .whitelist_function("slurmdb_.*")
+            .whitelist_var("ESCRIPT.*")
+            .whitelist_var("ESLURM.*")
+            .whitelist_var("SLURM.*")
+            .whitelist_var("SLURMDB.*")
+            .whitelist_var("SLURMRS.*")
+            .rustfmt_bindings(true)
+            .generate()
+            .expect("Unable to generate bindings");
 
-    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-    let bindings_path = out_dir.join("bindings.rs");
-
-    bindings
-        .write_to_file(&bindings_path)
-        .expect("Couldn't write bindings!");
+        bindings
+            .write_to_file(&bindings_path)
+            .expect("Couldn't write bindings!");
+    }
 
     // Now, we (grossly) parse the bindings file and emit a second file. This
     // contains information that the main `slurm` crate can use in *its*
