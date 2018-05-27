@@ -1,9 +1,16 @@
 # slurm-rs: slurm and slurmplus
 
-Rust bindings for the [Slurm workload manager](https://slurm.schedmd.com/), and
-a command-line program that provides some useful functionality.
+Rust bindings for the [Slurm workload manager](https://slurm.schedmd.com/),
+and a command-line program (`slurmplus`) that provides some useful
+functionality.
 
 The API coverage is far from complete, but the basic framework is in place.
+
+For a summary of recent changes to the code, see
+[CHANGELOG.md](./CHANGELOG.md) for the command-line tool,
+[slurm/CHANGELOG.md](slurm/CHANGELOG.md) for the developer-facing library, and
+[slurm-sys/CHANGELOG.md](slurm-sys/CHANGELOG.md) for the low-level FFI
+bindings.
 
 
 ## Building and Compatibility
