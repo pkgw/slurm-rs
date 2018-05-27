@@ -47,8 +47,9 @@ fn main() {
     if cfg!(slurmrs_on_docs_rs) {
         // Activate the hack!
         do_the_bindgen = false;
-        Command::new("wget")
-            .arg("-O")
+        Command::new("curl")
+            .arg("-sSL")
+            .arg("-o")
             .arg(&bindings_path)
             .arg(PREBUILT_BINDINGS_URL)
             .status()
