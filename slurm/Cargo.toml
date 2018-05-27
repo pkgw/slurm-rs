@@ -3,7 +3,7 @@
 
 [package]
 name = "slurm"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Peter Williams <peter@newton.cx>"]
 description = "Interface to the Slurm workload manager."
 homepage = "https://github.com/pkgw/slurm-rs"
@@ -21,10 +21,10 @@ failure = "0.1"
 failure_derive = "0.1"
 itertools = "0.7"
 libc = "0.2"
-slurm-sys = { path = "../slurm-sys", version = "0.1.1" }
+slurm-sys = { path = "../slurm-sys", version = "0.1.2" }
 
 [build-dependencies]
-slurm-sys = { path = "../slurm-sys", version = "0.1.1" } # needed to learn what C API provides
+slurm-sys = { path = "../slurm-sys", version = "0.1.2" } # needed to learn what C API provides
 
 [package.metadata.docs.rs]
 # Hack to get us building on docs.rs:

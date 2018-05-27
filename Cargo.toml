@@ -3,7 +3,7 @@
 
 [package]
 name = "slurmplus"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Peter Williams <peter@newton.cx>"]
 description = "A command-line tool for nice interaction with the Slurm workload manager."
 homepage = "https://github.com/pkgw/slurm-rs"
@@ -21,7 +21,7 @@ chrono = "0.4"
 failure = "0.1"
 failure_derive = "0.1"
 itertools = "0.7"
-slurm = { path = "slurm", version = "0.1.1" }
+slurm = { path = "slurm", version = "0.1.2" }
 structopt = "0.2"
 termcolor = "0.3"
 users = "0.6"
