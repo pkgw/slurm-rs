@@ -3,7 +3,7 @@
 
 [package]
 name = "slurm-sys"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Peter Williams <peter@newton.cx>"]
 links = "slurm"
 build = "build.rs"
