@@ -7,7 +7,13 @@ functionality.
 [![](http://meritbadge.herokuapp.com/slurm)](https://crates.io/crates/slurm)
 [![](https://docs.rs/slurm/badge.svg)](https://docs.rs/slurm)
 
-The API coverage is far from complete, but the basic framework is in place.
+- [slurm-sys on crates.io](https://crates.io/crates/slurm-sys)
+- [slurm on crates.io](https://crates.io/crates/slurm)
+- [slurmplus on crates.io](https://crates.io/crates/slurmplus)
+- [Rust API documentation for the slurm crate](https://docs.rs/slurm)
+
+The coverage of the underlying Slurm feature set is far from complete, but the
+basic framework is in place.
 
 For a summary of recent changes to the code, see
 [CHANGELOG.md](./CHANGELOG.md) for the command-line tool,
