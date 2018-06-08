@@ -4,6 +4,9 @@ Rust bindings for the [Slurm workload manager](https://slurm.schedmd.com/),
 and a command-line program (`slurmplus`) that provides some useful
 functionality.
 
+[![](http://meritbadge.herokuapp.com/slurm)](https://crates.io/crates/slurm)
+[![](https://docs.rs/slurm/badge.svg)](https://docs.rs/slurm)
+
 The API coverage is far from complete, but the basic framework is in place.
 
 For a summary of recent changes to the code, see
