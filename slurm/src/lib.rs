@@ -318,10 +318,63 @@ pub trait UnownedFromSlurmPointer {
 }
 
 
+/// Sub-helpers for the "job state enum" macros.
+///
+/// Some states are not available in older versions of Slurm. We jump through
+/// hoops to keep the Rust API consistent while not expecting those options
+/// from the C code.
+///
+/// In particular, for each potential enumeration item, we pass the main macro
+/// the name of a "filter" macro that it then invokes in various cases.
+/// In the `jse_all` version of the filter, it evaluates to the whatever item
+/// we want for a present and handle-able enumeration value.
+///
+/// For enum values that might not be present, we define different filter
+/// macros, use `#[cfg]` rules to choose whether (1) we just defer to
+/// `jse_all` (when that value is present) or (2) various "can't-happen" values.
+///
+/// In the particular case of the "system value" of each enum case, we use
+/// hardcoded dummy constants -- these must distinct because the values show
+/// up in a match expression. The Slurm data structures only use 1 byte to
+/// transfer the job state, so we can expect that valid values will be in the
+/// range 0-255. The `job_states` type, however, is at least u32.
+///
+/// XXX `to_slurm` should return a Result, and error out for inexpressible
+/// values.
+
+macro_rules! jse_all {
+    (SYSVAL, $sysname:ident) => { slurm_sys::$sysname };
+    (FROMVAL, $rustname:ident) => { Ok(JobState::$rustname) };
+}
+
+#[cfg(slurm_api_job_state_deadline)]
+macro_rules! jse_deadline { ($action:ident, $arg:ident) => { jse_all!($action, $arg) } }
+
+#[cfg(not(slurm_api_job_state_deadline))]
+macro_rules! jse_deadline {
+    (SYSVAL, $sysname:ident) => { 0xFF00 };
+    (FROMVAL, $rustname:ident) => { Err(format_err!("illegal job state code 0xFF00")) };
+}
+
+#[cfg(slurm_api_job_state_oom)]
+macro_rules! jse_oom { ($action:ident, $arg:ident) => { jse_all!($action, $arg) } }
+
+#[cfg(not(slurm_api_job_state_oom))]
+macro_rules! jse_oom {
+    (SYSVAL, $sysname:ident) => { 0xFF01 };
+    (FROMVAL, $rustname:ident) => { Err(format_err!("illegal job state code 0xFF01")) };
+}
+
 /// Helper for interfacing between the C `job_state` enum and our own type.
 macro_rules! make_job_state_enum {
-    ($(<$rustname:ident, $shortcode:ident, $sysname:path, $doc:expr;>),*) => {
+    ($(<$rustname:ident, $shortcode:ident, $filter:ident, $sysname:ident, $doc:expr;>),*) => {
         /// States that a job or job step can be in.
+        ///
+        /// The `Deadline` and `OutOfMemory` states are not available in all
+        /// versions of Slurm. Calling `to_slurm()` on one of these values
+        /// when built against such a version of Slurm will yield a nonsense
+        /// value that will probably cause bad things to happen. (TODO:
+        /// research the precise versions of Slurm in which these were added.)
         #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
         pub enum JobState {
             $(
@@ -333,7 +386,7 @@ macro_rules! make_job_state_enum {
             fn from_slurm(s: slurm_sys::job_states) -> Result<JobState, Error> {
                 match s {
                     $(
-                        $sysname => Ok(JobState::$rustname),
+                        $filter!(SYSVAL, $sysname) => $filter!(FROMVAL, $rustname),
                     )*
                     other => Err(format_err!("unrecognized job state code {}", other)),
                 }
@@ -343,7 +396,7 @@ macro_rules! make_job_state_enum {
             fn to_slurm(&self) -> slurm_sys::job_states {
                 match self {
                     $(
-                        &JobState::$rustname => $sysname,
+                        &JobState::$rustname => $filter!(SYSVAL, $sysname),
                     )*
                 }
             }
@@ -360,18 +413,18 @@ macro_rules! make_job_state_enum {
 }
 
 make_job_state_enum! {
-    <Pending, PD, slurm_sys::job_states_JOB_PENDING, "The job has not yet started running.";>,
-    <Running, R, slurm_sys::job_states_JOB_RUNNING, "The job is running.";>,
-    <Suspended, S, slurm_sys::job_states_JOB_SUSPENDED, "The job has been suspended.";>,
-    <Complete, CG, slurm_sys::job_states_JOB_COMPLETE, "The job finished successfully.";>,
-    <Cancelled, CA, slurm_sys::job_states_JOB_CANCELLED, "The job was cancelled.";>,
-    <Failed, F, slurm_sys::job_states_JOB_FAILED, "The job finished unsuccessfully.";>,
-    <Timeout, TO, slurm_sys::job_states_JOB_TIMEOUT, "The job was killed because it exceeded its time allocation.";>,
-    <NodeFail, NF, slurm_sys::job_states_JOB_NODE_FAIL, "The node running the job failed.";>,
-    <Preempted, PR, slurm_sys::job_states_JOB_PREEMPTED, "The job was killed by preemption.";>,
-    <BootFail, BF, slurm_sys::job_states_JOB_BOOT_FAIL, "The job failed because Slurm failed to launch it.";>,
-    <Deadline, DL, slurm_sys::job_states_JOB_DEADLINE, "The job failed to start in time.";>,
-    <OutOfMemory, OM, slurm_sys::job_states_JOB_OOM, "The job was killed because it exceeded its memory allocation.";>
+    <Pending, PD, jse_all, job_states_JOB_PENDING, "The job has not yet started running.";>,
+    <Running, R, jse_all, job_states_JOB_RUNNING, "The job is running.";>,
+    <Suspended, S, jse_all, job_states_JOB_SUSPENDED, "The job has been suspended.";>,
+    <Complete, CG, jse_all, job_states_JOB_COMPLETE, "The job finished successfully.";>,
+    <Cancelled, CA, jse_all, job_states_JOB_CANCELLED, "The job was cancelled.";>,
+    <Failed, F, jse_all, job_states_JOB_FAILED, "The job finished unsuccessfully.";>,
+    <Timeout, TO, jse_all, job_states_JOB_TIMEOUT, "The job was killed because it exceeded its time allocation.";>,
+    <NodeFail, NF, jse_all, job_states_JOB_NODE_FAIL, "The node running the job failed.";>,
+    <Preempted, PR, jse_all, job_states_JOB_PREEMPTED, "The job was killed by preemption.";>,
+    <BootFail, BF, jse_all, job_states_JOB_BOOT_FAIL, "The job failed because Slurm failed to launch it.";>,
+    <Deadline, DL, jse_deadline, job_states_JOB_DEADLINE, "The job failed to start in time.";>,
+    <OutOfMemory, OM, jse_oom, job_states_JOB_OOM, "The job was killed because it exceeded its memory allocation.";>
 }
 
 /// Helper for creating public structs that directly wrap Slurm API

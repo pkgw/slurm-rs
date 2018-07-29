@@ -132,6 +132,12 @@ fn main() {
                     state = State::CheckingSelectedStepT;
                 } else if line.starts_with("pub struct submit_response_msg {") {
                     state = State::CheckingSubmitResponseMsg;
+                } else if line.starts_with("pub const job_states_JOB_DEADLINE") {
+                    writeln!(features_file, "\"job_state_deadline\",")
+                        .expect(&format!("couldn't write to features output file {}", features_path.display()));
+                } else if line.starts_with("pub const job_states_JOB_OOM") {
+                    writeln!(features_file, "\"job_state_oom\",")
+                        .expect(&format!("couldn't write to features output file {}", features_path.display()));
                 }
             },
 
