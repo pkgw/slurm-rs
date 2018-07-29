@@ -29,8 +29,9 @@ addons:
       - libslurmdb-dev
 
 env:
-  - SLURM_LIBDIR=/usr/lib/x86_64-linux-gnu
-  - SLURM_INCDIR=/usr/include
+  global:
+    - SLURM_LIBDIR=/usr/lib/x86_64-linux-gnu
+    - SLURM_INCDIR=/usr/include
 
 script:
   - |
