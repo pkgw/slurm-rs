@@ -150,7 +150,7 @@ impl ColorIo {
     pub fn print_error(&mut self, err: Error) {
         let mut first = true;
 
-        for cause in err.causes() {
+        for cause in err.iter_chain() {
             if first {
                 ecprint!(self, red, "error:");
                 ecprintln!(self, pl, " {}", cause);
