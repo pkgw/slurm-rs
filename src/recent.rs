@@ -61,7 +61,7 @@ impl RecentCommand {
             grouped.len() - self.limit
         };
 
-        for group_info in grouped.values().sorted_by_key(|gi| gi.submit_time).iter().skip(skip) {
+        for group_info in grouped.values().sorted_by_key(|gi| gi.submit_time).skip(skip) {
             group_info.emit(cio, max_name_len, max_time_len);
         }
 
