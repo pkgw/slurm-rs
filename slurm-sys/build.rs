@@ -34,13 +34,13 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use std::process::Command;
 
-const PREBUILT_BINDINGS_URL: &str = "https://gist.github.com/pkgw/40e36f9dc0d771323205fc0617ac7141/\
-                                     raw/6405dba98cd0eec7fab483b3d090b919e1383094/bindings.rs";
+const PREBUILT_BINDINGS_URL: &str =
+    "https://gist.github.com/pkgw/40e36f9dc0d771323205fc0617ac7141/\
+     raw/6405dba98cd0eec7fab483b3d090b919e1383094/bindings.rs";
 
 fn main() {
     let mut do_the_bindgen = true;
-    let mut builder = bindgen::Builder::default()
-        .header("src/wrapper.h");
+    let mut builder = bindgen::Builder::default().header("src/wrapper.h");
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let bindings_path = out_dir.join("bindings.rs");
 
@@ -64,7 +64,10 @@ fn main() {
             builder = builder.clang_arg(format!("-I{}", incdir));
         }
     } else {
-        let slurm = pkg_config::Config::new().atleast_version("15.0").probe("slurm").unwrap();
+        let slurm = pkg_config::Config::new()
+            .atleast_version("15.0")
+            .probe("slurm")
+            .unwrap();
 
         println!("cargo:rustc-link-lib=dylib=slurmdb");
 
@@ -101,16 +104,22 @@ fn main() {
     // the C code supports. This all is the least-bad approach I can devise
     // that deals with the fact that the C API is not super stable.
 
-    let bindings_file = File::open(&bindings_path)
-        .expect(&format!("couldn't open bindgen output file {}", bindings_path.display()));
+    let bindings_file = File::open(&bindings_path).expect(&format!(
+        "couldn't open bindgen output file {}",
+        bindings_path.display()
+    ));
     let bindings_buf = BufReader::new(bindings_file);
 
     let features_path = out_dir.join("features.rs");
-    let mut features_file = File::create(&features_path)
-        .expect(&format!("couldn't create features output file {}", features_path.display()));
+    let mut features_file = File::create(&features_path).expect(&format!(
+        "couldn't create features output file {}",
+        features_path.display()
+    ));
 
-    writeln!(features_file, "pub const C_API_FEATURES: &[&str] = &[")
-        .expect(&format!("couldn't write to features output file {}", features_path.display()));
+    writeln!(features_file, "pub const C_API_FEATURES: &[&str] = &[").expect(&format!(
+        "couldn't write to features output file {}",
+        features_path.display()
+    ));
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum State {
@@ -123,7 +132,10 @@ fn main() {
     let mut n_lines = 0;
 
     for maybe_line in bindings_buf.lines() {
-        let line = maybe_line.expect(&format!("couldn't read bindgen output file {}", bindings_path.display()));
+        let line = maybe_line.expect(&format!(
+            "couldn't read bindgen output file {}",
+            bindings_path.display()
+        ));
         n_lines += 1;
 
         match state {
@@ -133,20 +145,28 @@ fn main() {
                 } else if line.starts_with("pub struct submit_response_msg {") {
                     state = State::CheckingSubmitResponseMsg;
                 } else if line.starts_with("pub const job_states_JOB_DEADLINE") {
-                    writeln!(features_file, "\"job_state_deadline\",")
-                        .expect(&format!("couldn't write to features output file {}", features_path.display()));
+                    writeln!(features_file, "\"job_state_deadline\",").expect(&format!(
+                        "couldn't write to features output file {}",
+                        features_path.display()
+                    ));
                 } else if line.starts_with("pub const job_states_JOB_OOM") {
-                    writeln!(features_file, "\"job_state_oom\",")
-                        .expect(&format!("couldn't write to features output file {}", features_path.display()));
+                    writeln!(features_file, "\"job_state_oom\",").expect(&format!(
+                        "couldn't write to features output file {}",
+                        features_path.display()
+                    ));
                 }
-            },
+            }
 
             State::CheckingSelectedStepT => {
                 if line == "}" {
                     state = State::Scanning;
                 } else if line.contains("pack_job_offset") {
-                    writeln!(features_file, "\"selected_step_t_pack_job_offset\",")
-                        .expect(&format!("couldn't write to features output file {}", features_path.display()));
+                    writeln!(features_file, "\"selected_step_t_pack_job_offset\",").expect(
+                        &format!(
+                            "couldn't write to features output file {}",
+                            features_path.display()
+                        ),
+                    );
                 }
             }
 
@@ -154,16 +174,23 @@ fn main() {
                 if line == "}" {
                     state = State::Scanning;
                 } else if line.contains("job_submit_user_msg") {
-                    writeln!(features_file, "\"submit_response_user_message\",")
-                        .expect(&format!("couldn't write to features output file {}", features_path.display()));
+                    writeln!(features_file, "\"submit_response_user_message\",").expect(&format!(
+                        "couldn't write to features output file {}",
+                        features_path.display()
+                    ));
                 }
             }
         }
     }
 
     // If rustfmt is unavailable, the output is all on two (very long) lines. Can't parse that.
-    assert!(n_lines > 100, "to build this crate you must install a functional \"rustfmt\" (see README.md)");
+    assert!(
+        n_lines > 100,
+        "to build this crate you must install a functional \"rustfmt\" (see README.md)"
+    );
 
-    writeln!(features_file, "];")
-        .expect(&format!("couldn't write to features output file {}", features_path.display()));
+    writeln!(features_file, "];").expect(&format!(
+        "couldn't write to features output file {}",
+        features_path.display()
+    ));
 }

@@ -12,7 +12,6 @@ use std::fmt;
 use std::io::Write;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
-
 /// How to style some text to print.
 ///
 /// Instead of using this type directly, use the `cprint!` family of macros.
@@ -34,7 +33,6 @@ pub enum Style {
     Yellow,
 }
 
-
 /// How to style some text to print.
 ///
 /// Instead of using this type directly, use the `cprint!` family of macros.
@@ -46,7 +44,6 @@ pub enum Stream {
     /// Print to standard output.
     Stdout,
 }
-
 
 macro_rules! cprint {
     ($cio:expr, green, $($fmt_args:expr),*) => {{
@@ -126,7 +123,6 @@ pub struct ColorIo {
     yellow: ColorSpec,
 }
 
-
 impl ColorIo {
     pub fn new() -> Self {
         let stdout = StandardStream::stdout(ColorChoice::Auto);
@@ -144,7 +140,14 @@ impl ColorIo {
         let mut yellow = ColorSpec::new();
         yellow.set_fg(Some(Color::Yellow)).set_bold(true);
 
-        ColorIo { stdout, stderr, green, highlight, red, yellow }
+        ColorIo {
+            stdout,
+            stderr,
+            green,
+            highlight,
+            red,
+            yellow,
+        }
     }
 
     pub fn print_error(&mut self, err: Error) {
@@ -176,22 +179,21 @@ impl ColorIo {
         match style {
             Style::Green => {
                 let _r = stream.set_color(&self.green);
-            },
+            }
 
             Style::Highlight => {
                 let _r = stream.set_color(&self.highlight);
-            },
+            }
 
-            Style::Plain => {
-            },
+            Style::Plain => {}
 
             Style::Red => {
                 let _r = stream.set_color(&self.red);
-            },
+            }
 
             Style::Yellow => {
                 let _r = stream.set_color(&self.yellow);
-            },
+            }
         }
 
         let _r = write!(stream, "{}", args);
@@ -199,10 +201,9 @@ impl ColorIo {
         match style {
             Style::Green | Style::Highlight | Style::Red | Style::Yellow => {
                 let _r = stream.reset();
-            },
+            }
 
-            Style::Plain => {
-            },
+            Style::Plain => {}
         }
     }
 }

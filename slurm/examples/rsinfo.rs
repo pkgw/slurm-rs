@@ -4,11 +4,12 @@
 /*! Print out information about a job.
  */
 
-#[macro_use] extern crate clap;
+#[macro_use]
+extern crate clap;
 extern crate failure;
 extern crate slurm;
 
-use clap::{Arg, App};
+use clap::{App, Arg};
 use failure::Error;
 use std::process;
 
@@ -16,10 +17,12 @@ fn main() {
     let matches = App::new("rsinfo")
         .version(crate_version!())
         .about("Print information about one job.")
-        .arg(Arg::with_name("JOBID")
-             .help("The jobid of the job in question")
-             .required(true)
-             .index(1))
+        .arg(
+            Arg::with_name("JOBID")
+                .help("The jobid of the job in question")
+                .required(true)
+                .index(1),
+        )
         .get_matches();
 
     let jobid = matches.value_of("JOBID").unwrap();
@@ -33,10 +36,9 @@ fn main() {
                 eprintln!("  caused by: {}", cause);
             }
             1
-        },
+        }
     });
 }
-
 
 fn inner(jobid: &str) -> Result<i32, Error> {
     let jobid = jobid.parse::<slurm::JobId>()?;

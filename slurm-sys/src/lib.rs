@@ -25,7 +25,7 @@ include!(concat!(env!("OUT_DIR"), "/features.rs"));
 /// zero it out; and (2) it takes additional arguments populated from C
 /// preprocessor `__FILE__` and `__LINE__` directives.
 #[no_mangle]
-pub extern fn slurmrs_free(ptr: *mut std::os::raw::c_void) {
+pub extern "C" fn slurmrs_free(ptr: *mut std::os::raw::c_void) {
     let mut copy = ptr;
     const TEXT: &[u8] = b"slurm-rs\0";
     unsafe { slurm_xfree(&mut copy, TEXT.as_ptr() as _, 1, TEXT.as_ptr() as _) };

@@ -7,7 +7,8 @@ extern crate chrono;
 extern crate failure;
 extern crate itertools;
 extern crate slurm;
-#[macro_use] extern crate structopt;
+#[macro_use]
+extern crate structopt;
 extern crate termcolor;
 extern crate users;
 
@@ -15,16 +16,19 @@ use failure::Error;
 use std::process;
 use structopt::StructOpt;
 
-#[macro_use] mod colorio; // keep first to get macros
+#[macro_use]
+mod colorio; // keep first to get macros
 mod recent;
 mod status;
 mod util;
 
 use colorio::ColorIo;
 
-
 #[derive(Debug, StructOpt)]
-#[structopt(name = "slurmplus", about = "Better commands for interacting with Slurm.")]
+#[structopt(
+    name = "slurmplus",
+    about = "Better commands for interacting with Slurm."
+)]
 enum SlurmPlusCli {
     #[structopt(name = "recent")]
     /// Summarize recently-run jobs
@@ -44,7 +48,6 @@ impl SlurmPlusCli {
     }
 }
 
-
 fn main() {
     let program = SlurmPlusCli::from_args();
     let mut cio = ColorIo::new();
@@ -55,6 +58,6 @@ fn main() {
         Err(e) => {
             cio.print_error(e);
             1
-        },
+        }
     });
 }

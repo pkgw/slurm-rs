@@ -5,7 +5,8 @@
  */
 
 extern crate chrono;
-#[macro_use] extern crate clap;
+#[macro_use]
+extern crate clap;
 extern crate failure;
 extern crate itertools;
 extern crate slurm;
@@ -33,10 +34,9 @@ fn main() {
                 eprintln!("  caused by: {}", cause);
             }
             1
-        },
+        }
     });
 }
-
 
 fn inner() -> Result<i32, Error> {
     let now = Utc::now();
@@ -49,7 +49,10 @@ fn inner() -> Result<i32, Error> {
     let db = slurm::DatabaseConnectionOwned::new()?;
     let jobs = db.get_jobs(&filter)?;
 
-    for (arrayid, group) in &jobs.iter().group_by(|job| job.array_job_id().unwrap_or_else(|| job.job_id())) {
+    for (arrayid, group) in &jobs
+        .iter()
+        .group_by(|job| job.array_job_id().unwrap_or_else(|| job.job_id()))
+    {
         let mut n_jobs = 0;
         let mut last_state = slurm::JobState::Failed;
         let mut states = HashMap::new();
