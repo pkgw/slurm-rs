@@ -33,10 +33,11 @@ env:
     - SLURM_LIBDIR=/usr/lib/x86_64-linux-gnu
     - SLURM_INCDIR=/usr/include
 
-install:
-  - rustup component add rustfmt-preview
+before_script:
+  - rustup component add rustfmt
 
 script:
   - |
+    cargo fmt --all -- --check &&
     cargo build --verbose &&
     cargo test
