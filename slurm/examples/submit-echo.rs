@@ -4,8 +4,10 @@
 /*! Submit a hello-world echo job
  */
 
-#[macro_use] extern crate clap;
-#[macro_use] extern crate failure;
+#[macro_use]
+extern crate clap;
+#[macro_use]
+extern crate failure;
 extern crate slurm;
 
 use clap::App;
@@ -28,10 +30,9 @@ fn main() {
                 eprintln!("  caused by: {}", cause);
             }
             1
-        },
+        }
     });
 }
-
 
 fn inner() -> Result<i32, Error> {
     let cwd = env::current_dir()?;
@@ -39,7 +40,9 @@ fn inner() -> Result<i32, Error> {
     let log = {
         let mut p = cwd.clone();
         p.push("%j.log");
-        p.to_str().ok_or(format_err!("cannot stringify log path"))?.to_owned()
+        p.to_str()
+            .ok_or(format_err!("cannot stringify log path"))?
+            .to_owned()
     };
 
     let mut desc = slurm::JobDescriptorOwned::new();
@@ -51,10 +54,12 @@ fn inner() -> Result<i32, Error> {
         .set_stdin_path("/dev/null")
         .set_stdout_path(&log)
         .set_work_dir_cwd()?
-        .set_script("#! /bin/bash
+        .set_script(
+            "#! /bin/bash
 set -e -x
 echo hello world \"$@\"
-")
+",
+        )
         .set_gid_current() // JobDescriptor args must come after due to the return type
         .set_num_tasks(1)
         .set_time_limit(5)

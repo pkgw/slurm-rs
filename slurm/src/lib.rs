@@ -112,8 +112,10 @@ or allocating memory associated with their sub-structures.
 */
 
 extern crate chrono;
-#[macro_use] extern crate failure;
-#[macro_use] extern crate failure_derive;
+#[macro_use]
+extern crate failure;
+#[macro_use]
+extern crate failure_derive;
 extern crate libc;
 extern crate slurm_sys;
 
@@ -127,13 +129,11 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::os::raw::{c_char, c_int, c_void};
 
-
 /// A job identifier number; this will always be `u32`.
 pub type JobId = u32;
 
 /// A job-step identifier number; this will always be `u32`.
 pub type StepId = u32;
-
 
 /// A quick macro framework to map low-level slurm API errors to a Rust interface.
 macro_rules! declare_slurm_errors {
@@ -189,7 +189,6 @@ impl Display for SlurmError {
     }
 }
 
-
 /// Most Slurm API calls return an zero on success. The library API docs state
 /// that the return code on error is -1, and this macro encapsulates the task
 /// of obtaining an errno and converting it to a result. However, in at least
@@ -203,7 +202,7 @@ macro_rules! stry {
         } else {
             Ok(())
         }?
-    }}
+    }};
 }
 
 /// This is like `stry!` but also wraps the Slurm call in an `unsafe{}` block,
@@ -211,7 +210,7 @@ macro_rules! stry {
 macro_rules! ustry {
     ($op:expr) => {
         stry!(unsafe { $op })
-    }
+    };
 }
 
 /// This is like `stry!` but for unsafe Slurm calls that return pointers.
@@ -225,15 +224,19 @@ macro_rules! pstry {
         } else {
             Ok(ptr)
         }?
-    }}
+    }};
 }
-
 
 /// Allocate memory using Slurm's allocator.
 fn slurm_alloc_array<T>(count: usize) -> *mut T {
     const TEXT: &[u8] = b"slurm-rs\0";
     let ptr = unsafe {
-        slurm_sys::slurm_try_xmalloc(std::mem::size_of::<T>() * count, TEXT.as_ptr() as _, 1, TEXT.as_ptr() as _)
+        slurm_sys::slurm_try_xmalloc(
+            std::mem::size_of::<T>() * count,
+            TEXT.as_ptr() as _,
+            1,
+            TEXT.as_ptr() as _,
+        )
     };
 
     if ptr.is_null() {
@@ -243,12 +246,10 @@ fn slurm_alloc_array<T>(count: usize) -> *mut T {
     ptr as _
 }
 
-
 /// Allocate a structure using Slurm's allocator.
 fn slurm_alloc<T>() -> *mut T {
     slurm_alloc_array(1)
 }
-
 
 /// Allocate a C-style string using Slurm's allocator, encoding it as UTF-8.
 fn slurm_alloc_utf8_string<S: AsRef<str>>(s: S) -> *mut c_char {
@@ -256,18 +257,19 @@ fn slurm_alloc_utf8_string<S: AsRef<str>>(s: S) -> *mut c_char {
     let n = bytes.len() + 1;
     let ptr = slurm_alloc_array(n);
     let dest = unsafe { std::slice::from_raw_parts_mut(ptr, n) };
-    dest[..n-1].copy_from_slice(bytes);
-    dest[n-1] = b'\0';
+    dest[..n - 1].copy_from_slice(bytes);
+    dest[n - 1] = b'\0';
     ptr as _
 }
-
 
 /// Allocate an array of C-style strings using Slurm's allocator.
 ///
 /// The strings are encoded as UTF8. Returns the pointer to the string array
 /// and the number of strings allocated, which may not be known by the caller
 /// if the argument is an iterator of indeterminate size.
-fn slurm_alloc_utf8_string_array<I: IntoIterator<Item = S>, S: AsRef<str>>(strings: I) -> (*mut *mut c_char, usize) {
+fn slurm_alloc_utf8_string_array<I: IntoIterator<Item = S>, S: AsRef<str>>(
+    strings: I,
+) -> (*mut *mut c_char, usize) {
     let buf: Vec<_> = strings.into_iter().collect();
     let ptr = slurm_alloc_array(buf.len());
     let sl = unsafe { std::slice::from_raw_parts_mut(ptr, buf.len()) };
@@ -279,7 +281,6 @@ fn slurm_alloc_utf8_string_array<I: IntoIterator<Item = S>, S: AsRef<str>>(strin
     (ptr, buf.len())
 }
 
-
 /// Free a structure using Slurm's allocator.
 ///
 /// A mutable reference to the pointer is required; after freeing, the pointer
@@ -289,7 +290,6 @@ fn slurm_free<T>(thing: &mut *mut T) {
     let p = &mut (*thing as *mut c_void);
     unsafe { slurm_sys::slurm_xfree(p, TEXT.as_ptr() as _, 1, TEXT.as_ptr() as _) };
 }
-
 
 /// Free an array of strings allocated through Slurm's allocator.
 ///
@@ -309,14 +309,12 @@ fn slurm_free_string_array(ptr_ref: &mut *mut *mut c_char, count: usize) {
     slurm_free(ptr_ref);
 }
 
-
 /// A helper trait that lets us generically iterate over lists. It must be
 /// public so that we can expose `Iterator` for `SlurmListIteratorOwned`.
 pub trait UnownedFromSlurmPointer {
     /// Create an unowned wrapper object from a Slurm pointer.
     fn unowned_from_slurm_pointer(ptr: *mut c_void) -> Self;
 }
-
 
 /// Sub-helpers for the "job state enum" macros.
 ///
@@ -343,26 +341,46 @@ pub trait UnownedFromSlurmPointer {
 /// values.
 
 macro_rules! jse_all {
-    (SYSVAL, $sysname:ident) => { slurm_sys::$sysname };
-    (FROMVAL, $rustname:ident) => { Ok(JobState::$rustname) };
+    (SYSVAL, $sysname:ident) => {
+        slurm_sys::$sysname
+    };
+    (FROMVAL, $rustname:ident) => {
+        Ok(JobState::$rustname)
+    };
 }
 
 #[cfg(slurm_api_job_state_deadline)]
-macro_rules! jse_deadline { ($action:ident, $arg:ident) => { jse_all!($action, $arg) } }
+macro_rules! jse_deadline {
+    ($action:ident, $arg:ident) => {
+        jse_all!($action, $arg)
+    };
+}
 
 #[cfg(not(slurm_api_job_state_deadline))]
 macro_rules! jse_deadline {
-    (SYSVAL, $sysname:ident) => { 0xFF00 };
-    (FROMVAL, $rustname:ident) => { Err(format_err!("illegal job state code 0xFF00")) };
+    (SYSVAL, $sysname:ident) => {
+        0xFF00
+    };
+    (FROMVAL, $rustname:ident) => {
+        Err(format_err!("illegal job state code 0xFF00"))
+    };
 }
 
 #[cfg(slurm_api_job_state_oom)]
-macro_rules! jse_oom { ($action:ident, $arg:ident) => { jse_all!($action, $arg) } }
+macro_rules! jse_oom {
+    ($action:ident, $arg:ident) => {
+        jse_all!($action, $arg)
+    };
+}
 
 #[cfg(not(slurm_api_job_state_oom))]
 macro_rules! jse_oom {
-    (SYSVAL, $sysname:ident) => { 0xFF01 };
-    (FROMVAL, $rustname:ident) => { Err(format_err!("illegal job state code 0xFF01")) };
+    (SYSVAL, $sysname:ident) => {
+        0xFF01
+    };
+    (FROMVAL, $rustname:ident) => {
+        Err(format_err!("illegal job state code 0xFF01"))
+    };
 }
 
 /// Helper for interfacing between the C `job_state` enum and our own type.
@@ -479,7 +497,7 @@ macro_rules! make_slurm_wrap_struct {
                 $rust_name(ptr as _)
             }
         }
-    }
+    };
 }
 
 /// Helper for creating "owned" versions of unowned structs. This is super
@@ -543,7 +561,6 @@ macro_rules! make_owned_version {
         }
     };
 }
-
 
 // The slurm list type gets custom implementations because we give it a type
 // parameter to allow typed access.
@@ -616,7 +633,6 @@ impl<T> Drop for SlurmListOwned<T> {
     }
 }
 
-
 /// Customized support for lists of strings.
 impl SlurmList<*mut c_char> {
     pub fn iter<'a>(&'a self) -> SlurmStringListIteratorOwned<'a> {
@@ -636,14 +652,18 @@ impl SlurmList<*mut c_char> {
             self.0 = unsafe { slurm_sys::slurm_list_create(Some(slurm_sys::slurmrs_free)) };
         }
 
-        unsafe { slurm_sys::slurm_list_append(self.0, ptr as _); }
+        unsafe {
+            slurm_sys::slurm_list_append(self.0, ptr as _);
+        }
     }
 }
 
-
 // Likewise for iterating through lists, except the iterators are always owned
 #[derive(Debug)]
-pub struct SlurmListIteratorOwned<'a, T: 'a + UnownedFromSlurmPointer>(*mut slurm_sys::listIterator, PhantomData<&'a T>);
+pub struct SlurmListIteratorOwned<'a, T: 'a + UnownedFromSlurmPointer>(
+    *mut slurm_sys::listIterator,
+    PhantomData<&'a T>,
+);
 
 impl<'a, T: 'a + UnownedFromSlurmPointer> Drop for SlurmListIteratorOwned<'a, T> {
     fn drop(&mut self) {
@@ -664,7 +684,6 @@ impl<'a, T: 'a + UnownedFromSlurmPointer> Iterator for SlurmListIteratorOwned<'a
         }
     }
 }
-
 
 /// A helper for iterating through lists of strings.
 #[derive(Debug)]
@@ -690,10 +709,12 @@ impl<'a> Iterator for SlurmStringListIteratorOwned<'a> {
     }
 }
 
-
 // Now we can finally start wrapping types that we care about.
 
-make_slurm_wrap_struct!(JobInfo, slurm_sys::job_info, "\
+make_slurm_wrap_struct!(
+    JobInfo,
+    slurm_sys::job_info,
+    "\
 Information about a running job.
 
 The following items in the Slurm API are *not* exposed in these Rust bindings:
@@ -814,20 +835,20 @@ pub struct job_info {
 }
 ```
 
-");
+"
+);
 
 impl JobInfo {
-     /// Get this job's ID.
-     pub fn job_id(&self) -> JobId {
-         self.sys_data().job_id
-     }
+    /// Get this job's ID.
+    pub fn job_id(&self) -> JobId {
+        self.sys_data().job_id
+    }
 
-     /// Get the cluster partition on which this job resides.
-     pub fn partition(&self) -> Cow<str> {
-         unsafe { CStr::from_ptr(self.sys_data().partition) }.to_string_lossy()
-     }
+    /// Get the cluster partition on which this job resides.
+    pub fn partition(&self) -> Cow<str> {
+        unsafe { CStr::from_ptr(self.sys_data().partition) }.to_string_lossy()
+    }
 }
-
 
 /// Get information about a single job.
 ///
@@ -844,18 +865,25 @@ pub fn get_job_info(jid: JobId) -> Result<SingleJobInfoMessageOwned, Error> {
 
     let rc = unsafe { (*msg).record_count };
     if rc != 1 {
-        return Err(format_err!("expected exactly one info record for job {}; got {} items", jid, rc));
+        return Err(format_err!(
+            "expected exactly one info record for job {}; got {} items",
+            jid,
+            rc
+        ));
     }
 
     Ok(unsafe { SingleJobInfoMessageOwned::assume_ownership(msg as _) })
 }
 
-
-make_slurm_wrap_struct!(SingleJobInfoMessage, slurm_sys::job_info_msg_t, "Information about a single job.
+make_slurm_wrap_struct!(
+    SingleJobInfoMessage,
+    slurm_sys::job_info_msg_t,
+    "Information about a single job.
 
 This type implements `Deref` to `JobInfo` and so can be essentially be
 treated as a `JobInfo`. Due to how the Slurm library manages memory, this
-separate type is necessary in some cases.");
+separate type is necessary in some cases."
+);
 
 impl Deref for SingleJobInfoMessage {
     type Target = JobInfo;
@@ -880,8 +908,11 @@ impl Drop for SingleJobInfoMessageOwned {
     }
 }
 
-
-make_slurm_wrap_struct!(DatabaseConnection, c_void, "A connection to the Slurm accounting database.");
+make_slurm_wrap_struct!(
+    DatabaseConnection,
+    c_void,
+    "A connection to the Slurm accounting database."
+);
 
 impl DatabaseConnection {
     /// Query for information about jobs.
@@ -890,7 +921,6 @@ impl DatabaseConnection {
         Ok(unsafe { SlurmListOwned::assume_ownership(ptr as _) })
     }
 }
-
 
 make_owned_version!(@customdrop DatabaseConnection, DatabaseConnectionOwned,
                     "An owned version of `DatabaseConnection`.");
@@ -911,8 +941,10 @@ impl Drop for DatabaseConnectionOwned {
     }
 }
 
-
-make_slurm_wrap_struct!(JobFilters, slurm_sys::slurmdb_job_cond_t, "\
+make_slurm_wrap_struct!(
+    JobFilters,
+    slurm_sys::slurmdb_job_cond_t,
+    "\
 A set of filters for identifying jobs of interest when querying the Slurm
 accounting database.
 
@@ -947,7 +979,8 @@ pub struct slurmdb_job_cond_t {
 }
 ```
 
-");
+"
+);
 
 impl JobFilters {
     pub fn step_list(&self) -> &SlurmList<JobStepFilter> {
@@ -982,7 +1015,11 @@ impl JobFilters {
     }
 }
 
-make_owned_version!(JobFilters, JobFiltersOwned, "An owned version of `JobFilters`");
+make_owned_version!(
+    JobFilters,
+    JobFiltersOwned,
+    "An owned version of `JobFilters`"
+);
 
 impl Default for JobFiltersOwned {
     fn default() -> Self {
@@ -995,9 +1032,11 @@ impl Default for JobFiltersOwned {
     }
 }
 
-
-make_slurm_wrap_struct!(JobStepFilter, slurm_sys::slurmdb_selected_step_t,
-                        "A filter for selecting jobs and job steps.");
+make_slurm_wrap_struct!(
+    JobStepFilter,
+    slurm_sys::slurmdb_selected_step_t,
+    "A filter for selecting jobs and job steps."
+);
 
 make_owned_version!(@customdrop JobStepFilter, JobStepFilterOwned, "An owned version of `JobStepFilter`.");
 
@@ -1031,15 +1070,21 @@ impl SlurmList<JobStepFilter> {
 
         if self.0.is_null() {
             // XXX if malloc fails, I think this function will abort under us.
-            self.0 = unsafe { slurm_sys::slurm_list_create(Some(slurm_sys::slurmdb_destroy_selected_step)) };
+            self.0 = unsafe {
+                slurm_sys::slurm_list_create(Some(slurm_sys::slurmdb_destroy_selected_step))
+            };
         }
 
-        unsafe { slurm_sys::slurm_list_append(self.0, item.0 as _); }
+        unsafe {
+            slurm_sys::slurm_list_append(self.0, item.0 as _);
+        }
     }
 }
 
-
-make_slurm_wrap_struct!(JobRecord, slurm_sys::slurmdb_job_rec_t, "\
+make_slurm_wrap_struct!(
+    JobRecord,
+    slurm_sys::slurmdb_job_rec_t,
+    "\
 Accounting information about a job.
 
 The following items in the Slurm API are *not* exposed in these Rust bindings:
@@ -1087,7 +1132,8 @@ pub struct slurmdb_job_rec_t {
 
 (The above listing omits fields that would be handled by the
 `JobStepRecordSharedFields` trait.)
-");
+"
+);
 
 /// A trait for accessing fields common to SlurmDB job records and step
 /// records.
@@ -1152,7 +1198,7 @@ macro_rules! impl_job_step_record_shared_fields {
             }
 
             fn exit_code(&self) -> Option<i32> {
-                match self.sys_data().end as i64  {
+                match self.sys_data().end as i64 {
                     0 => None,
                     _ => Some(self.sys_data().exitcode as i32),
                 }
@@ -1183,7 +1229,7 @@ macro_rules! impl_job_step_record_shared_fields {
                 }
             }
         }
-    }
+    };
 }
 
 impl_job_step_record_shared_fields!(JobRecord);
@@ -1214,7 +1260,7 @@ impl JobRecord {
 
     /// Get the job's name.
     pub fn job_name(&self) -> Cow<str> {
-         unsafe { CStr::from_ptr(self.sys_data().jobname) }.to_string_lossy()
+        unsafe { CStr::from_ptr(self.sys_data().jobname) }.to_string_lossy()
     }
 
     /// Get the job's submission time.
@@ -1225,7 +1271,8 @@ impl JobRecord {
     /// Get the wallclock time spent waiting for the job to become eligible,
     /// or None if the job has not yet become eligible to run.
     pub fn eligible_wait_duration(&self) -> Option<Duration> {
-        self.eligible_time().map(|t| t.signed_duration_since(self.submit_time()))
+        self.eligible_time()
+            .map(|t| t.signed_duration_since(self.submit_time()))
     }
 
     /// Get the job's time limit in minutes.
@@ -1238,7 +1285,8 @@ impl JobRecord {
     ///
     /// This includes time that the job spent waiting to become eligible to run.
     pub fn wait_duration(&self) -> Option<Duration> {
-        self.start_time().map(|t| t.signed_duration_since(self.submit_time()))
+        self.start_time()
+            .map(|t| t.signed_duration_since(self.submit_time()))
     }
 
     /// Steps.
@@ -1247,8 +1295,10 @@ impl JobRecord {
     }
 }
 
-
-make_slurm_wrap_struct!(StepRecord, slurm_sys::slurmdb_step_rec_t, "\
+make_slurm_wrap_struct!(
+    StepRecord,
+    slurm_sys::slurmdb_step_rec_t,
+    "\
 Accounting information about a step within a job.
 
 The following items in the Slurm API are *not* exposed in these Rust bindings:
@@ -1268,24 +1318,27 @@ pub struct slurmdb_step_rec_t {
 
 (The above listing omits fields that would be handled by the
 `JobStepRecordSharedFields` trait.)
-");
+"
+);
 
 impl_job_step_record_shared_fields!(StepRecord);
 
 impl StepRecord {
     /// Get the step's ID.
     pub fn step_id(&self) -> StepId {
-         self.sys_data().stepid
+        self.sys_data().stepid
     }
 
     /// Get the step's name.
     pub fn step_name(&self) -> Cow<str> {
-         unsafe { CStr::from_ptr(self.sys_data().stepname) }.to_string_lossy()
+        unsafe { CStr::from_ptr(self.sys_data().stepname) }.to_string_lossy()
     }
 }
 
-
-make_slurm_wrap_struct!(JobDescriptor, slurm_sys::job_descriptor, "\
+make_slurm_wrap_struct!(
+    JobDescriptor,
+    slurm_sys::job_descriptor,
+    "\
 A description of a batch job to submit.
 
 The following items in the Slurm API are *not* exposed in these Rust bindings:
@@ -1400,7 +1453,8 @@ pub struct job_descriptor {
 }
 ```
 
-");
+"
+);
 
 impl JobDescriptor {
     /// Get the group ID associated with this job.
@@ -1421,7 +1475,7 @@ impl JobDescriptor {
 
     /// Get this job's name.
     pub fn name(&self) -> Cow<str> {
-         unsafe { CStr::from_ptr(self.sys_data().name) }.to_string_lossy()
+        unsafe { CStr::from_ptr(self.sys_data().name) }.to_string_lossy()
     }
 
     /// Get the number of tasks within this job.
@@ -1437,27 +1491,27 @@ impl JobDescriptor {
 
     /// Get this job's assigned partition.
     pub fn partition(&self) -> Cow<str> {
-         unsafe { CStr::from_ptr(self.sys_data().partition) }.to_string_lossy()
+        unsafe { CStr::from_ptr(self.sys_data().partition) }.to_string_lossy()
     }
 
     /// Get the contents of this job's batch wrapper script.
     pub fn script(&self) -> Cow<str> {
-         unsafe { CStr::from_ptr(self.sys_data().script) }.to_string_lossy()
+        unsafe { CStr::from_ptr(self.sys_data().script) }.to_string_lossy()
     }
 
     /// Get the path for this job's standard error stream.
     pub fn stderr_path(&self) -> Cow<str> {
-         unsafe { CStr::from_ptr(self.sys_data().std_err) }.to_string_lossy()
+        unsafe { CStr::from_ptr(self.sys_data().std_err) }.to_string_lossy()
     }
 
     /// Get the path for this job's standard input stream.
     pub fn stdin_path(&self) -> Cow<str> {
-         unsafe { CStr::from_ptr(self.sys_data().std_in) }.to_string_lossy()
+        unsafe { CStr::from_ptr(self.sys_data().std_in) }.to_string_lossy()
     }
 
     /// Get the path for this job's standard output stream.
     pub fn stdout_path(&self) -> Cow<str> {
-         unsafe { CStr::from_ptr(self.sys_data().std_out) }.to_string_lossy()
+        unsafe { CStr::from_ptr(self.sys_data().std_out) }.to_string_lossy()
     }
 
     /// Get the time limit associated with this job, measured in minutes.
@@ -1491,7 +1545,7 @@ impl JobDescriptor {
 
     /// Get the contents of this job's assigned working directory.
     pub fn work_dir(&self) -> Cow<str> {
-         unsafe { CStr::from_ptr(self.sys_data().work_dir) }.to_string_lossy()
+        unsafe { CStr::from_ptr(self.sys_data().work_dir) }.to_string_lossy()
     }
 
     /// Submit this job to the batch processor.
@@ -1510,7 +1564,9 @@ impl JobDescriptorOwned {
     /// Create a new, defaulted job descriptor.
     pub fn new() -> Self {
         let inst = unsafe { Self::alloc_zeroed() };
-        unsafe { slurm_sys::slurm_init_job_desc_msg((inst.0).0); }
+        unsafe {
+            slurm_sys::slurm_init_job_desc_msg((inst.0).0);
+        }
         inst
     }
 
@@ -1539,7 +1595,10 @@ impl JobDescriptorOwned {
     }
 
     /// Explicitly specify the UNIX environment of the job.
-    pub fn set_environment<I: IntoIterator<Item = S>, S: AsRef<str>>(&mut self, env: I) -> &mut Self {
+    pub fn set_environment<I: IntoIterator<Item = S>, S: AsRef<str>>(
+        &mut self,
+        env: I,
+    ) -> &mut Self {
         self.maybe_clear_environment();
         let (ptr, size) = slurm_alloc_utf8_string_array(env);
         {
@@ -1641,9 +1700,10 @@ impl JobDescriptorOwned {
     /// See `std::env::current_dir` for an explanation of the cases in which
     /// this operation can fail.
     pub fn set_work_dir_cwd(&mut self) -> Result<&mut Self, Error> {
-        Ok(self.set_work_dir(std::env::current_dir()?
-                          .to_str()
-                          .ok_or(format_err!("could not express CWD as UTF8"))?
+        Ok(self.set_work_dir(
+            std::env::current_dir()?
+                .to_str()
+                .ok_or(format_err!("could not express CWD as UTF8"))?,
         ))
     }
 }
@@ -1668,10 +1728,13 @@ impl Drop for JobDescriptorOwned {
     }
 }
 
-
-make_slurm_wrap_struct!(SubmitResponseMessage, slurm_sys::submit_response_msg, "\
+make_slurm_wrap_struct!(
+    SubmitResponseMessage,
+    slurm_sys::submit_response_msg,
+    "\
 Information returned by Slurm upon job submission.
-");
+"
+);
 
 impl SubmitResponseMessage {
     /// Get the job ID of the new job.
