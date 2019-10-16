@@ -1,4 +1,4 @@
-# Copyright 2018 Peter K. G. Williams and collaborators
+# Copyright 2018-2019 Peter K. G. Williams and collaborators
 # Licensed under the MIT License
 
 language: rust
@@ -21,6 +21,12 @@ matrix:
       rust: nightly
   allow_failures:
     - rust: nightly
+
+# Don't CI branches besides master. PR's still get built! But this prevents
+# PRs being built twice in the standard workflow.
+branches:
+  only:
+    - master
 
 addons:
   apt:
