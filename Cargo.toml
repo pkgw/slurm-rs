@@ -24,7 +24,7 @@ itertools = "0.9"
 slurm = { path = "slurm", version = "0.1.3" }
 structopt = "0.3"
 termcolor = "1.1"
-users = "0.9"
+users = "0.10"
 
 [package.metadata.docs.rs]
 # Hack to get us building on docs.rs:
