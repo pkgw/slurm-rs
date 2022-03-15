@@ -1,3 +1,14 @@
+# NOTE: Unmaintained
+
+This repo is unmaintained and hasn't been updated in a long time. It worked pretty
+decently, but I haven't needed it for a while.
+
+Architecturally, the API/ABI to the Slurm libraries was not very stable, and was
+pretty hard to use. It would probably be better to develop a crate that invokes
+the Slurm CLI programs under the hood, rather than trying to link against the
+shared libraries.
+
+
 # slurm-rs: slurm and slurmplus
 
 Rust bindings for the [Slurm workload manager](https://slurm.schedmd.com/),
